@@ -172,12 +172,13 @@ export default function CompliancePage() {
 
       const projectIds = userProjects.map((p) => p.id);
 
-      const { data: sigsData } = await supabase
+      const { data: sigsData, error: sigsError } = await supabase
         .from("signatures")
         .select("*")
-        .in("project_id", projectIds) as unknown as { data: Tables<"signatures">[] | null };
+        .in("project_id", projectIds) as unknown as { data: Tables<"signatures">[] | null; error: { message: string } | null };
 
       if (cancelled) return;
+      if (sigsError) console.error("Failed to fetch signatures:", sigsError.message);
       setSignatures(sigsData ?? []);
       setLoading(false);
     }

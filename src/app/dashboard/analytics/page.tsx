@@ -130,15 +130,17 @@ export default function AnalyticsPage() {
         supabase
           .from("signatures")
           .select("*")
-          .in("project_id", projectIds) as unknown as { data: Tables<"signatures">[] | null },
+          .in("project_id", projectIds) as unknown as { data: Tables<"signatures">[] | null; error: { message: string } | null },
         supabase
           .from("activity_log")
           .select("*")
           .eq("user_id", user!.id)
-          .order("created_at", { ascending: false }) as unknown as { data: Tables<"activity_log">[] | null },
+          .order("created_at", { ascending: false }) as unknown as { data: Tables<"activity_log">[] | null; error: { message: string } | null },
       ]);
 
       if (cancelled) return;
+      if (sigResult.error) console.error("Failed to fetch signatures:", sigResult.error.message);
+      if (actResult.error) console.error("Failed to fetch activity log:", actResult.error.message);
       setSignatures(sigResult.data ?? []);
       setActivityLog(actResult.data ?? []);
       setLoading(false);

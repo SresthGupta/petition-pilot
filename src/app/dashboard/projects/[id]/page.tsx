@@ -137,7 +137,10 @@ export default function ProjectDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ voterFileId }),
       });
-      await res.json();
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        console.error("Voter file parse failed:", result.error);
+      }
       await fetchData();
     } catch {
       await fetchData();
