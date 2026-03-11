@@ -273,8 +273,12 @@ export default function VerifyPage() {
                   status: status === "pending" ? "skipped" : status,
                   verified_by: user?.id ?? null,
                   verified_at: new Date().toISOString(),
+                  matched_voter_id: activeMatch?.voter.id ?? null,
                   matched_voter_name: activeMatch?.voter.full_name ?? null,
+                  matched_voter_address: activeMatch?.voter.address ?? null,
+                  matched_voter_party: activeMatch?.voter.party ?? null,
                   match_confidence: activeMatch?.confidence ?? null,
+                  match_method: activeMatch ? "manual" : null,
                 }
               : s
           )
@@ -758,6 +762,48 @@ export default function VerifyPage() {
                     })()}
                   </div>
                 </div>
+
+                {/* Previously Matched Voter (shown when navigating back to a verified signature) */}
+                {current && current.matched_voter_name && current.status !== "pending" && (
+                  <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50/50 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+                        Matched Voter
+                      </h3>
+                      {current.match_confidence != null && (
+                        <span className={`ml-auto text-sm font-black ${confidenceColor(current.match_confidence)}`}>
+                          {current.match_confidence}%
+                        </span>
+                      )}
+                    </div>
+                    {current.match_confidence != null && (
+                      <div className="mb-3 h-1.5 w-full rounded-full bg-emerald-100 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-700 ${confidenceBarColor(current.match_confidence)}`}
+                          style={{ width: `${current.match_confidence}%` }}
+                        />
+                      </div>
+                    )}
+                    <p className="text-sm font-semibold text-gray-900">{current.matched_voter_name}</p>
+                    {current.matched_voter_address && (
+                      <p className="mt-1 text-xs text-gray-600 flex items-center gap-1.5">
+                        <MapPin className="h-3 w-3 text-gray-400" />
+                        {current.matched_voter_address}
+                      </p>
+                    )}
+                    {current.matched_voter_party && (
+                      <p className="mt-1 text-xs text-gray-600 flex items-center gap-1.5">
+                        <User className="h-3 w-3 text-gray-400" />
+                        {current.matched_voter_party}
+                      </p>
+                    )}
+                    <p className="mt-2 text-[11px] text-emerald-600/70">
+                      {current.matched_voter_address ? "Matched by name + address" : "Matched by name only"}
+                      {current.verified_at && ` · ${new Date(current.verified_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`}
+                    </p>
+                  </div>
+                )}
 
                 {/* AI Best Match */}
                 <div>
