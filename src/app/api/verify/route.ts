@@ -5,7 +5,7 @@ import type { Tables, UpdateTables } from "@/lib/supabase/types";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { signatureId, action, matchedVoter, confidence } = body;
+    const { signatureId, action, matchedVoter, matchedVoterId, confidence } = body;
 
     if (!signatureId || !action) {
       return NextResponse.json(
@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
     };
 
     if (matchedVoter) {
+      updatePayload.matched_voter_id = matchedVoterId || null;
       updatePayload.matched_voter_name = matchedVoter.name || null;
       updatePayload.matched_voter_address = matchedVoter.address || null;
       updatePayload.matched_voter_party = matchedVoter.party || null;

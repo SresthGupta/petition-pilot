@@ -259,6 +259,7 @@ export default function VerifyPage() {
                   party: activeMatch.voter.party,
                 }
               : undefined,
+            matchedVoterId: activeMatch?.voter.id ?? undefined,
             confidence: activeMatch?.confidence ?? undefined,
           }),
         });

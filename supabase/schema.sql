@@ -85,6 +85,7 @@ CREATE TABLE public.signatures (
   extracted_address TEXT NOT NULL,
   extracted_date TEXT,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'verified', 'invalid', 'flagged', 'skipped')) NOT NULL,
+  matched_voter_id UUID REFERENCES public.voters(id),
   matched_voter_name TEXT,
   matched_voter_address TEXT,
   matched_voter_party TEXT,

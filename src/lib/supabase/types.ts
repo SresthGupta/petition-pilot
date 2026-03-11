@@ -138,6 +138,7 @@ export interface Database {
           extracted_address: string;
           extracted_date: string | null;
           status: "pending" | "verified" | "invalid" | "flagged" | "skipped";
+          matched_voter_id: string | null;
           matched_voter_name: string | null;
           matched_voter_address: string | null;
           matched_voter_party: string | null;
@@ -158,6 +159,7 @@ export interface Database {
           extracted_address: string;
           extracted_date?: string | null;
           status?: "pending" | "verified" | "invalid" | "flagged" | "skipped";
+          matched_voter_id?: string | null;
           matched_voter_name?: string | null;
           matched_voter_address?: string | null;
           matched_voter_party?: string | null;
@@ -171,6 +173,7 @@ export interface Database {
         };
         Update: {
           status?: "pending" | "verified" | "invalid" | "flagged" | "skipped";
+          matched_voter_id?: string | null;
           matched_voter_name?: string | null;
           matched_voter_address?: string | null;
           matched_voter_party?: string | null;
