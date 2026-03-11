@@ -152,6 +152,8 @@ CREATE POLICY "Users can view own voter files" ON public.voter_files FOR SELECT
   USING (EXISTS (SELECT 1 FROM public.projects WHERE projects.id = voter_files.project_id AND projects.user_id = auth.uid()));
 CREATE POLICY "Users can insert own voter files" ON public.voter_files FOR INSERT
   WITH CHECK (EXISTS (SELECT 1 FROM public.projects WHERE projects.id = voter_files.project_id AND projects.user_id = auth.uid()));
+CREATE POLICY "Users can update own voter files" ON public.voter_files FOR UPDATE
+  USING (EXISTS (SELECT 1 FROM public.projects WHERE projects.id = voter_files.project_id AND projects.user_id = auth.uid()));
 
 -- Voters: access through project ownership
 CREATE POLICY "Users can view own voters" ON public.voters FOR SELECT
