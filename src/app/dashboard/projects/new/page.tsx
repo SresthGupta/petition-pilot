@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -14,7 +15,12 @@ import {
   Calendar,
   MapPin,
   FileType,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/supabase/types";
 
 const steps = [
   { number: 1, label: "Project Details" },
@@ -23,56 +29,16 @@ const steps = [
 ];
 
 const jurisdictions = [
-  "Alabama",
-  "Alaska",
-  "Arizona",
-  "Arkansas",
-  "California",
-  "Colorado",
-  "Connecticut",
-  "Delaware",
-  "Florida",
-  "Georgia",
-  "Hawaii",
-  "Idaho",
-  "Illinois",
-  "Indiana",
-  "Iowa",
-  "Kansas",
-  "Kentucky",
-  "Louisiana",
-  "Maine",
-  "Maryland",
-  "Massachusetts",
-  "Michigan",
-  "Minnesota",
-  "Mississippi",
-  "Missouri",
-  "Montana",
-  "Nebraska",
-  "Nevada",
-  "New Hampshire",
-  "New Jersey",
-  "New Mexico",
-  "New York",
-  "North Carolina",
-  "North Dakota",
-  "Ohio",
-  "Oklahoma",
-  "Oregon",
-  "Pennsylvania",
-  "Rhode Island",
-  "South Carolina",
-  "South Dakota",
-  "Tennessee",
-  "Texas",
-  "Utah",
-  "Vermont",
-  "Virginia",
-  "Washington",
-  "West Virginia",
-  "Wisconsin",
-  "Wyoming",
+  "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado",
+  "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho",
+  "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana",
+  "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota",
+  "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada",
+  "New Hampshire", "New Jersey", "New Mexico", "New York",
+  "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon",
+  "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
+  "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington",
+  "West Virginia", "Wisconsin", "Wyoming",
 ];
 
 const petitionTypes = [
@@ -84,13 +50,25 @@ const petitionTypes = [
   "Other",
 ];
 
-interface UploadedFile {
+interface PendingFile {
+  file: File;
   name: string;
   size: string;
   type: string;
+  progress: number;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export default function NewProjectPage() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const supabase = createClient();
+
   const [currentStep, setCurrentStep] = useState(1);
 
   // Step 1 state
@@ -98,36 +76,47 @@ export default function NewProjectPage() {
   const [jurisdiction, setJurisdiction] = useState("");
   const [petitionType, setPetitionType] = useState("");
   const [deadline, setDeadline] = useState("");
+  const [description, setDescription] = useState("");
 
   // Step 2 state
-  const [petitionFiles, setPetitionFiles] = useState<UploadedFile[]>([]);
-  const [voterFiles, setVoterFiles] = useState<UploadedFile[]>([]);
+  const [petitionFiles, setPetitionFiles] = useState<PendingFile[]>([]);
+  const [voterFiles, setVoterFiles] = useState<PendingFile[]>([]);
   const [dragOverPetition, setDragOverPetition] = useState(false);
   const [dragOverVoter, setDragOverVoter] = useState(false);
+  const petitionInputRef = useRef<HTMLInputElement>(null);
+  const voterInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFakeDrop = useCallback(
-    (zone: "petition" | "voter") => {
+  // Launch state
+  const [launching, setLaunching] = useState(false);
+  const [launchError, setLaunchError] = useState<string | null>(null);
+
+  const addFiles = useCallback(
+    (files: FileList | null, zone: "petition" | "voter") => {
+      if (!files) return;
+      const newFiles: PendingFile[] = Array.from(files).map((f) => ({
+        file: f,
+        name: f.name,
+        size: formatFileSize(f.size),
+        type: f.name.split(".").pop()?.toUpperCase() || "FILE",
+        progress: 0,
+      }));
       if (zone === "petition") {
-        setPetitionFiles((prev) => [
-          ...prev,
-          {
-            name: `petition-sheet-${prev.length + 1}.pdf`,
-            size: "2.4 MB",
-            type: "PDF",
-          },
-        ]);
+        setPetitionFiles((prev) => [...prev, ...newFiles]);
       } else {
-        setVoterFiles((prev) => [
-          ...prev,
-          {
-            name: `voter-file-${prev.length + 1}.csv`,
-            size: "8.1 MB",
-            type: "CSV",
-          },
-        ]);
+        setVoterFiles((prev) => [...prev, ...newFiles]);
       }
     },
     []
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent, zone: "petition" | "voter") => {
+      e.preventDefault();
+      if (zone === "petition") setDragOverPetition(false);
+      else setDragOverVoter(false);
+      addFiles(e.dataTransfer.files, zone);
+    },
+    [addFiles]
   );
 
   const removeFile = (zone: "petition" | "voter", index: number) => {
@@ -144,13 +133,169 @@ export default function NewProjectPage() {
     return true;
   };
 
+  const updateFileProgress = (
+    zone: "petition" | "voter",
+    index: number,
+    progress: number
+  ) => {
+    const setter = zone === "petition" ? setPetitionFiles : setVoterFiles;
+    setter((prev) =>
+      prev.map((f, i) => (i === index ? { ...f, progress } : f))
+    );
+  };
+
+  const handleLaunch = async () => {
+    if (!user) return;
+    setLaunching(true);
+    setLaunchError(null);
+
+    try {
+      // 1. Create the project in the DB
+      const { data: project, error: insertError } = await supabase
+        .from("projects")
+        .insert({
+          user_id: user.id,
+          name,
+          state: jurisdiction,
+          petition_type: petitionType,
+          description: description || null,
+          deadline: deadline || null,
+          status: "active" as const,
+        } as any)
+        .select()
+        .single() as { data: Tables<"projects"> | null; error: any };
+
+      if (insertError || !project) {
+        throw new Error(insertError?.message || "Failed to create project");
+      }
+
+      // 2. Upload petition sheets to storage and create DB records
+      for (let i = 0; i < petitionFiles.length; i++) {
+        const pf = petitionFiles[i];
+        const storagePath = `${user.id}/${project.id}/${pf.file.name}`;
+
+        updateFileProgress("petition", i, 30);
+
+        const { error: uploadError } = await supabase.storage
+          .from("petition-sheets")
+          .upload(storagePath, pf.file, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (uploadError) {
+          throw new Error(
+            `Failed to upload petition sheet "${pf.name}": ${uploadError.message}`
+          );
+        }
+
+        updateFileProgress("petition", i, 70);
+
+        const { error: recordError } = await supabase
+          .from("petition_sheets")
+          .insert({
+            project_id: project.id,
+            file_name: pf.file.name,
+            file_path: storagePath,
+            file_size: pf.file.size,
+            mime_type: pf.file.type || "application/octet-stream",
+            sheet_number: i + 1,
+            ocr_status: "pending" as const,
+          } as any);
+
+        if (recordError) {
+          throw new Error(
+            `Failed to save petition sheet record: ${recordError.message}`
+          );
+        }
+
+        updateFileProgress("petition", i, 100);
+      }
+
+      // 3. Upload voter files to storage and create DB records
+      for (let i = 0; i < voterFiles.length; i++) {
+        const vf = voterFiles[i];
+        const storagePath = `${user.id}/${project.id}/${vf.file.name}`;
+
+        updateFileProgress("voter", i, 30);
+
+        const { error: uploadError } = await supabase.storage
+          .from("voter-files")
+          .upload(storagePath, vf.file, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (uploadError) {
+          throw new Error(
+            `Failed to upload voter file "${vf.name}": ${uploadError.message}`
+          );
+        }
+
+        updateFileProgress("voter", i, 70);
+
+        const { error: recordError } = await supabase
+          .from("voter_files")
+          .insert({
+            project_id: project.id,
+            file_name: vf.file.name,
+            file_path: storagePath,
+            file_size: vf.file.size,
+            record_count: 0,
+            parsed_status: "pending" as const,
+          } as any);
+
+        if (recordError) {
+          throw new Error(
+            `Failed to save voter file record: ${recordError.message}`
+          );
+        }
+
+        updateFileProgress("voter", i, 100);
+      }
+
+      // 4. Redirect to project detail page
+      router.push(`/dashboard/projects/${project.id}`);
+    } catch (err: unknown) {
+      setLaunchError(
+        err instanceof Error ? err.message : "An unexpected error occurred"
+      );
+      setLaunching(false);
+    }
+  };
+
   const inputClass =
     "w-full rounded-lg border border-[var(--border)] bg-white px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] outline-none transition-colors focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10";
 
-  const labelClass = "block text-sm font-medium text-[var(--foreground)] mb-1.5";
+  const labelClass =
+    "block text-sm font-medium text-[var(--foreground)] mb-1.5";
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
+      {/* Hidden file inputs */}
+      <input
+        ref={petitionInputRef}
+        type="file"
+        multiple
+        accept=".pdf,.png,.jpg,.jpeg,.tiff,.tif"
+        className="hidden"
+        onChange={(e) => {
+          addFiles(e.target.files, "petition");
+          e.target.value = "";
+        }}
+      />
+      <input
+        ref={voterInputRef}
+        type="file"
+        multiple
+        accept=".csv,.xlsx,.xls"
+        className="hidden"
+        onChange={(e) => {
+          addFiles(e.target.files, "voter");
+          e.target.value = "";
+        }}
+      />
+
       {/* Back button */}
       <Link
         href="/dashboard/projects"
@@ -211,6 +356,14 @@ export default function NewProjectPage() {
           </div>
         ))}
       </div>
+
+      {/* Error banner */}
+      {launchError && (
+        <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-[var(--danger)]">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>{launchError}</div>
+        </div>
+      )}
 
       {/* Step content */}
       <div className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
@@ -288,6 +441,19 @@ export default function NewProjectPage() {
                 onChange={(e) => setDeadline(e.target.value)}
                 className={inputClass}
               />
+              <p className="mt-1 text-xs text-[var(--muted)]">Optional</p>
+            </div>
+
+            <div>
+              <label className={labelClass}>Description</label>
+              <textarea
+                placeholder="Brief description of this petition project..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                className={inputClass}
+              />
+              <p className="mt-1 text-xs text-[var(--muted)]">Optional</p>
             </div>
           </div>
         )}
@@ -302,17 +468,13 @@ export default function NewProjectPage() {
                 Upload scanned petition sheets as PDF or image files.
               </p>
               <div
-                onClick={() => handleFakeDrop("petition")}
+                onClick={() => petitionInputRef.current?.click()}
                 onDragOver={(e) => {
                   e.preventDefault();
                   setDragOverPetition(true);
                 }}
                 onDragLeave={() => setDragOverPetition(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragOverPetition(false);
-                  handleFakeDrop("petition");
-                }}
+                onDrop={(e) => handleDrop(e, "petition")}
                 className={`cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
                   dragOverPetition
                     ? "border-[var(--primary)] bg-indigo-50"
@@ -347,13 +509,26 @@ export default function NewProjectPage() {
                         <p className="text-xs text-[var(--muted)]">
                           {file.type} &middot; {file.size}
                         </p>
+                        {file.progress > 0 && file.progress < 100 && (
+                          <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-gray-200">
+                            <div
+                              className="h-full rounded-full bg-[var(--primary)] transition-all"
+                              style={{ width: `${file.progress}%` }}
+                            />
+                          </div>
+                        )}
                       </div>
-                      <button
-                        onClick={() => removeFile("petition", i)}
-                        className="shrink-0 rounded-md p-1 text-[var(--muted)] hover:bg-gray-200 hover:text-[var(--danger)]"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+                      {!launching && (
+                        <button
+                          onClick={() => removeFile("petition", i)}
+                          className="shrink-0 rounded-md p-1 text-[var(--muted)] hover:bg-gray-200 hover:text-[var(--danger)]"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                      {file.progress === 100 && (
+                        <Check className="h-4 w-4 shrink-0 text-[var(--success)]" />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -367,17 +542,13 @@ export default function NewProjectPage() {
                 Upload the registered voter file for signature matching.
               </p>
               <div
-                onClick={() => handleFakeDrop("voter")}
+                onClick={() => voterInputRef.current?.click()}
                 onDragOver={(e) => {
                   e.preventDefault();
                   setDragOverVoter(true);
                 }}
                 onDragLeave={() => setDragOverVoter(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragOverVoter(false);
-                  handleFakeDrop("voter");
-                }}
+                onDrop={(e) => handleDrop(e, "voter")}
                 className={`cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
                   dragOverVoter
                     ? "border-[var(--accent)] bg-cyan-50"
@@ -411,13 +582,26 @@ export default function NewProjectPage() {
                         <p className="text-xs text-[var(--muted)]">
                           {file.type} &middot; {file.size}
                         </p>
+                        {file.progress > 0 && file.progress < 100 && (
+                          <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-gray-200">
+                            <div
+                              className="h-full rounded-full bg-[var(--accent)] transition-all"
+                              style={{ width: `${file.progress}%` }}
+                            />
+                          </div>
+                        )}
                       </div>
-                      <button
-                        onClick={() => removeFile("voter", i)}
-                        className="shrink-0 rounded-md p-1 text-[var(--muted)] hover:bg-gray-200 hover:text-[var(--danger)]"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+                      {!launching && (
+                        <button
+                          onClick={() => removeFile("voter", i)}
+                          className="shrink-0 rounded-md p-1 text-[var(--muted)] hover:bg-gray-200 hover:text-[var(--danger)]"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                      {file.progress === 100 && (
+                        <Check className="h-4 w-4 shrink-0 text-[var(--success)]" />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -468,10 +652,26 @@ export default function NewProjectPage() {
                   Deadline
                 </p>
                 <p className="mt-1 text-sm font-medium text-[var(--foreground)]">
-                  {deadline || "Not set"}
+                  {deadline
+                    ? new Date(deadline + "T00:00:00").toLocaleDateString(
+                        "en-US",
+                        { month: "long", day: "numeric", year: "numeric" }
+                      )
+                    : "Not set"}
                 </p>
               </div>
             </div>
+
+            {description && (
+              <div className="rounded-lg bg-gray-50 p-4">
+                <p className="text-xs font-medium uppercase tracking-wider text-[var(--muted)]">
+                  Description
+                </p>
+                <p className="mt-1 text-sm text-[var(--foreground)]">
+                  {description}
+                </p>
+              </div>
+            )}
 
             {/* Uploaded files summary */}
             <div className="space-y-3">
@@ -555,9 +755,9 @@ export default function NewProjectPage() {
       <div className="flex items-center justify-between">
         <button
           onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}
-          disabled={currentStep === 1}
+          disabled={currentStep === 1 || launching}
           className={`inline-flex items-center gap-2 rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm font-medium transition-colors ${
-            currentStep === 1
+            currentStep === 1 || launching
               ? "cursor-not-allowed text-gray-300"
               : "text-[var(--foreground)] hover:bg-gray-50"
           }`}
@@ -580,9 +780,22 @@ export default function NewProjectPage() {
             <ArrowRight className="h-4 w-4" />
           </button>
         ) : (
-          <button className="inline-flex items-center gap-2 rounded-lg bg-[var(--success)] px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-600">
-            <Rocket className="h-4 w-4" />
-            Launch Project
+          <button
+            onClick={handleLaunch}
+            disabled={launching}
+            className="inline-flex items-center gap-2 rounded-lg bg-[var(--success)] px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:opacity-60"
+          >
+            {launching ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Launching...
+              </>
+            ) : (
+              <>
+                <Rocket className="h-4 w-4" />
+                Launch Project
+              </>
+            )}
           </button>
         )}
       </div>

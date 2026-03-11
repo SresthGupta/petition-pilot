@@ -1,26 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { email, password } = body;
+  const { action } = body;
 
-  if (!email || !password) {
-    return NextResponse.json(
-      { success: false, error: "Email and password are required" },
-      { status: 400 }
-    );
+  if (action === "signout") {
+    try {
+      const supabase = await createServerSupabaseClient();
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        return NextResponse.json(
+          { success: false, error: error.message },
+          { status: 500 }
+        );
+      }
+      return NextResponse.json({ success: true });
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Failed to sign out" },
+        { status: 500 }
+      );
+    }
   }
 
-  // TODO: Replace with real authentication (e.g. NextAuth, Clerk, or custom JWT)
-  return NextResponse.json({
-    success: true,
-    token: "mock-jwt-token",
-    user: {
-      id: "usr_demo_001",
-      name: "Demo User",
-      email,
-      organization: "Campaign for Progress",
-      role: "admin",
-    },
-  });
+  return NextResponse.json(
+    { success: false, error: "Unknown action" },
+    { status: 400 }
+  );
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@/lib/auth-context";
 import {
   Rocket,
   LayoutDashboard,
@@ -12,6 +13,7 @@ import {
   Bell,
   LogOut,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 
 const navItems = [
@@ -36,13 +38,53 @@ function getBreadcrumbs(pathname: string) {
   return crumbs;
 }
 
+function getInitials(name: string | null | undefined, email: string | null | undefined): string {
+  if (name) {
+    return name
+      .split(" ")
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  }
+  if (email) return email[0].toUpperCase();
+  return "?";
+}
+
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, profile, loading, signOut } = useAuth();
   const breadcrumbs = getBreadcrumbs(pathname);
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push("/login");
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[var(--background)]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+          <p className="text-sm text-[var(--muted)]">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    router.push("/login");
+    return null;
+  }
+
+  const displayName = profile?.full_name || user.user_metadata?.full_name || user.email || "User";
+  const displayEmail = profile?.email || user.email || "";
+  const initials = getInitials(profile?.full_name || user.user_metadata?.full_name, user.email);
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--background)]">
@@ -85,18 +127,30 @@ export default function DashboardLayout({
         {/* User section */}
         <div className="border-t border-indigo-800/50 p-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-400/20 text-sm font-semibold text-white">
-              DU
-            </div>
+            {profile?.avatar_url ? (
+              <img
+                src={profile.avatar_url}
+                alt={displayName}
+                className="h-9 w-9 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-400/20 text-sm font-semibold text-white">
+                {initials}
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <p className="truncate text-sm font-medium text-white">
-                Demo User
+                {displayName}
               </p>
               <p className="truncate text-xs text-indigo-300">
-                demo@example.com
+                {displayEmail}
               </p>
             </div>
-            <button className="rounded-md p-1.5 text-indigo-300 transition-colors hover:bg-indigo-500/10 hover:text-white">
+            <button
+              onClick={handleSignOut}
+              title="Sign out"
+              className="rounded-md p-1.5 text-indigo-300 transition-colors hover:bg-indigo-500/10 hover:text-white"
+            >
               <LogOut className="h-4 w-4" />
             </button>
           </div>
@@ -136,9 +190,17 @@ export default function DashboardLayout({
               <Bell className="h-5 w-5" />
               <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--danger)]" />
             </button>
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--primary)] text-xs font-semibold text-white">
-              DU
-            </div>
+            {profile?.avatar_url ? (
+              <img
+                src={profile.avatar_url}
+                alt={displayName}
+                className="h-8 w-8 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--primary)] text-xs font-semibold text-white">
+                {initials}
+              </div>
+            )}
           </div>
         </header>
 

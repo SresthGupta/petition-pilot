@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { createClient } from "@/lib/supabase/client";
 import {
   User,
   Lock,
@@ -15,22 +17,10 @@ import {
   BarChart3,
   AlertTriangle,
   Shield,
+  CheckCircle2,
+  XCircle,
+  Loader2,
 } from "lucide-react";
-
-const mockTeamMembers = [
-  {
-    name: "Sarah Chen",
-    email: "sarah@campaign.org",
-    role: "Admin",
-    initials: "SC",
-  },
-  {
-    name: "Marcus Rivera",
-    email: "marcus@campaign.org",
-    role: "Verifier",
-    initials: "MR",
-  },
-];
 
 function Toggle({
   enabled,
@@ -56,16 +46,67 @@ function Toggle({
   );
 }
 
+function Toast({
+  message,
+  type,
+  onClose,
+}: {
+  message: string;
+  type: "success" | "error";
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 4000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div
+      className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium shadow-lg transition-all ${
+        type === "success"
+          ? "bg-emerald-600 text-white"
+          : "bg-red-600 text-white"
+      }`}
+    >
+      {type === "success" ? (
+        <CheckCircle2 className="h-4 w-4" />
+      ) : (
+        <XCircle className="h-4 w-4" />
+      )}
+      {message}
+    </div>
+  );
+}
+
+const mockTeamMembers = [
+  {
+    name: "Sarah Chen",
+    email: "sarah@campaign.org",
+    role: "Admin",
+    initials: "SC",
+  },
+  {
+    name: "Marcus Rivera",
+    email: "marcus@campaign.org",
+    role: "Verifier",
+    initials: "MR",
+  },
+];
+
 export default function SettingsPage() {
+  const { user, profile, refreshProfile } = useAuth();
+  const supabase = createClient();
+
   // Profile
-  const [name, setName] = useState("Demo User");
-  const [email, setEmail] = useState("demo@example.com");
-  const [organization, setOrganization] = useState("Campaign for Progress");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [organization, setOrganization] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
 
   // Password
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
 
   // Notifications
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -75,8 +116,84 @@ export default function SettingsPage() {
   // API Key
   const [apiKey] = useState("pp_live_sk_a1b2c3d4e5f6...x7y8z9");
 
+  // Toast
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  // Load real profile data
+  useEffect(() => {
+    if (profile) {
+      setName(profile.full_name || "");
+      setEmail(profile.email || "");
+      setOrganization(profile.organization || "");
+    } else if (user) {
+      setName(user.user_metadata?.full_name || "");
+      setEmail(user.email || "");
+    }
+  }, [profile, user]);
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    setSavingProfile(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: name,
+          organization: organization,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+
+      if (error) throw error;
+      await refreshProfile();
+      setToast({ message: "Profile updated successfully", type: "success" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to update profile";
+      setToast({ message, type: "error" });
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPassword) {
+      setToast({ message: "Please enter a new password", type: "error" });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setToast({ message: "Passwords do not match", type: "error" });
+      return;
+    }
+    if (newPassword.length < 6) {
+      setToast({ message: "Password must be at least 6 characters", type: "error" });
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setNewPassword("");
+      setConfirmPassword("");
+      setToast({ message: "Password updated successfully", type: "success" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to update password";
+      setToast({ message, type: "error" });
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-3xl space-y-8">
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         <p className="mt-1 text-sm text-gray-500">
@@ -109,9 +226,12 @@ export default function SettingsPage() {
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              disabled
+              className="mt-1.5 w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-500 cursor-not-allowed"
             />
+            <p className="mt-1 text-xs text-gray-400">
+              Email cannot be changed here. Contact support if needed.
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">
@@ -125,7 +245,12 @@ export default function SettingsPage() {
             />
           </div>
           <div className="flex justify-end pt-2">
-            <button className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
+            <button
+              onClick={handleSaveProfile}
+              disabled={savingProfile}
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            >
+              {savingProfile && <Loader2 className="h-4 w-4 animate-spin" />}
               Save Changes
             </button>
           </div>
@@ -143,23 +268,13 @@ export default function SettingsPage() {
         <div className="space-y-4 p-6">
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Current password
-            </label>
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
               New password
             </label>
             <input
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="At least 6 characters"
               className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
           </div>
@@ -175,7 +290,12 @@ export default function SettingsPage() {
             />
           </div>
           <div className="flex justify-end pt-2">
-            <button className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
+            <button
+              onClick={handleChangePassword}
+              disabled={savingPassword}
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            >
+              {savingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
               Update Password
             </button>
           </div>
