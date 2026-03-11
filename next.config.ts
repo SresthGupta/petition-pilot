@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["tesseract.js", "tesseract.js-core"],
+  /* no external packages needed after migrating from tesseract.js to Gemini API */
 };
 
 export default nextConfig;
