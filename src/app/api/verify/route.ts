@@ -4,7 +4,15 @@ import type { Tables, UpdateTables } from "@/lib/supabase/types";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid JSON in request body" },
+        { status: 400 }
+      );
+    }
     const { signatureId, action, matchedVoter, matchedVoterId, confidence } = body;
 
     if (!signatureId || !action) {
@@ -136,8 +144,8 @@ export async function POST(request: NextRequest) {
         .eq("id", projectId);
     }
 
-    // Create activity log entry
-    await supabase.from("activity_log").insert({
+    // Create activity log entry (non-blocking, don't fail the request if this errors)
+    const { error: logError } = await supabase.from("activity_log").insert({
       user_id: user.id,
       project_id: projectId,
       action: `signature_${action}`,
@@ -150,6 +158,9 @@ export async function POST(request: NextRequest) {
         confidence: confidence || null,
       },
     });
+    if (logError) {
+      console.error("Failed to insert activity log:", logError.message);
+    }
 
     return NextResponse.json({
       success: true,

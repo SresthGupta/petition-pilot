@@ -239,14 +239,14 @@ export default function VerifyPage() {
       // Determine the matched voter info
       const activeMatchIdx = selectedMatchIndex;
       const activeMatch =
-        activeMatchIdx !== null && activeMatchIdx >= 1
+        activeMatchIdx !== null
           ? matches[activeMatchIdx]
           : matches[0] ?? null;
 
       setVerifyingAction(true);
       try {
         const action = status === "pending" ? "skipped" : status;
-        await fetch("/api/verify", {
+        const res = await fetch("/api/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -263,6 +263,14 @@ export default function VerifyPage() {
             confidence: activeMatch?.confidence ?? undefined,
           }),
         });
+
+        const result = await res.json();
+
+        if (!res.ok || !result.success) {
+          flash("red");
+          setVerifyingAction(false);
+          return;
+        }
 
         // Update local state
         setSignatures((prev) =>
@@ -288,7 +296,7 @@ export default function VerifyPage() {
         // Also refresh project counts
         fetchProject();
       } catch {
-        // Silently fail - the UI already flashed
+        flash("red");
       }
       setVerifyingAction(false);
 

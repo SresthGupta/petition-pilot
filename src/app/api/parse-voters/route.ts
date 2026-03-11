@@ -112,7 +112,15 @@ function isExcelFile(fileName: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
-    const { voterFileId } = await request.json();
+    let voterFileId: string;
+    try {
+      ({ voterFileId } = await request.json());
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid JSON in request body" },
+        { status: 400 }
+      );
+    }
 
     if (!voterFileId) {
       return NextResponse.json(

@@ -124,7 +124,15 @@ function getMimeType(filePath: string): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const { sheetId } = await request.json();
+    let sheetId: string;
+    try {
+      ({ sheetId } = await request.json());
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid JSON in request body" },
+        { status: 400 }
+      );
+    }
 
     if (!sheetId) {
       return NextResponse.json(

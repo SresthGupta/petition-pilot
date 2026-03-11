@@ -164,7 +164,15 @@ function levenshtein(a: string, b: string): number {
 
 export async function POST(request: NextRequest) {
   try {
-    const { projectId, signatureId } = await request.json();
+    let projectId: string, signatureId: string;
+    try {
+      ({ projectId, signatureId } = await request.json());
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid JSON in request body" },
+        { status: 400 }
+      );
+    }
 
     if (!projectId || !signatureId) {
       return NextResponse.json(
