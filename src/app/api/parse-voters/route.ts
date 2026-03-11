@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Tables, InsertTables } from "@/lib/supabase/types";
 
@@ -15,6 +16,12 @@ const COLUMN_MAP: Record<string, string> = {
   votername: "full_name",
   "voter name": "full_name",
   "full name": "full_name",
+  first_name: "first_name",
+  firstname: "first_name",
+  "first name": "first_name",
+  last_name: "last_name",
+  lastname: "last_name",
+  "last name": "last_name",
   address: "address",
   street_address: "address",
   streetaddress: "address",
@@ -56,6 +63,51 @@ const COLUMN_MAP: Record<string, string> = {
 function normalizeColumnName(col: string): string | null {
   const normalized = col.toLowerCase().trim().replace(/[\s_-]+/g, "_");
   return COLUMN_MAP[normalized] || COLUMN_MAP[col.toLowerCase().trim()] || null;
+}
+
+/**
+ * Parse an Excel file (.xlsx, .xls) into an array of row objects.
+ */
+function parseExcelToRows(buffer: ArrayBuffer): Record<string, string>[] {
+  const workbook = XLSX.read(buffer, { type: "array" });
+  const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+  if (!firstSheet) return [];
+
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, {
+    defval: "",
+    raw: false,
+  });
+
+  // Convert all values to strings
+  return rows.map((row) => {
+    const stringRow: Record<string, string> = {};
+    for (const [key, val] of Object.entries(row)) {
+      stringRow[key] = String(val ?? "").trim();
+    }
+    return stringRow;
+  });
+}
+
+/**
+ * Parse a CSV file into an array of row objects.
+ */
+function parseCsvToRows(text: string): { rows: Record<string, string>[]; headers: string[] } {
+  const parsed = Papa.parse<Record<string, string>>(text, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: (header) => header.trim(),
+  });
+
+  if (parsed.errors.length > 0 && parsed.data.length === 0) {
+    throw new Error(`CSV parsing failed: ${parsed.errors[0]?.message || "Unknown parse error"}`);
+  }
+
+  return { rows: parsed.data, headers: parsed.meta.fields || [] };
+}
+
+function isExcelFile(fileName: string): boolean {
+  const ext = fileName.toLowerCase().split(".").pop();
+  return ext === "xlsx" || ext === "xls" || ext === "xlsb" || ext === "xlsm";
 }
 
 export async function POST(request: NextRequest) {
@@ -120,16 +172,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const text = await fileData.text();
+    // Parse the file based on type (Excel or CSV)
+    let rows: Record<string, string>[];
+    let headers: string[];
 
-    // Parse CSV
-    const parsed = Papa.parse<Record<string, string>>(text, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (header) => header.trim(),
-    });
-
-    if (parsed.errors.length > 0 && parsed.data.length === 0) {
+    try {
+      if (isExcelFile(voterFile.file_name)) {
+        const buffer = await fileData.arrayBuffer();
+        rows = parseExcelToRows(buffer);
+        headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+      } else {
+        const text = await fileData.text();
+        const csvResult = parseCsvToRows(text);
+        rows = csvResult.rows;
+        headers = csvResult.headers;
+      }
+    } catch (parseError) {
       await supabase
         .from("voter_files")
         .update({ parsed_status: "failed" as const })
@@ -137,25 +195,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: `CSV parsing failed: ${parsed.errors[0]?.message || "Unknown parse error"}`,
+          error: `File parsing failed: ${parseError instanceof Error ? parseError.message : "Unknown error"}. Supported formats: CSV, XLSX, XLS.`,
         },
         { status: 400 }
       );
     }
 
-    // Build column mapping from the CSV headers
-    const csvHeaders = parsed.meta.fields || [];
+    if (rows.length === 0) {
+      await supabase
+        .from("voter_files")
+        .update({ parsed_status: "failed" as const })
+        .eq("id", voterFileId);
+      return NextResponse.json(
+        { success: false, error: "File is empty or has no data rows" },
+        { status: 400 }
+      );
+    }
+
+    // Build column mapping from headers
     const columnMapping: Record<string, string> = {};
-    for (const header of csvHeaders) {
+    for (const header of headers) {
       const mapped = normalizeColumnName(header);
       if (mapped) {
         columnMapping[header] = mapped;
       }
     }
 
-    // Validate that we have at least name and address columns
+    // Check for first_name + last_name combo (merge into full_name)
     const mappedFields = new Set(Object.values(columnMapping));
-    if (!mappedFields.has("full_name")) {
+    const hasFirstLast = mappedFields.has("first_name") && mappedFields.has("last_name");
+
+    if (!mappedFields.has("full_name") && !hasFirstLast) {
       await supabase
         .from("voter_files")
         .update({ parsed_status: "failed" as const })
@@ -163,7 +233,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: `Could not find a name column. Headers found: ${csvHeaders.join(", ")}`,
+          error: `Could not find a name column. Headers found: ${headers.join(", ")}. Expected one of: name, full_name, voter_name, or first_name + last_name.`,
         },
         { status: 400 }
       );
@@ -172,12 +242,19 @@ export async function POST(request: NextRequest) {
     // Transform rows into voter records
     const voterInserts: InsertTables<"voters">[] = [];
 
-    for (const row of parsed.data) {
+    for (const row of rows) {
       const mapped: Record<string, string> = {};
       for (const [csvCol, dbCol] of Object.entries(columnMapping)) {
         if (row[csvCol]) {
           mapped[dbCol] = row[csvCol].trim();
         }
+      }
+
+      // Handle first_name + last_name -> full_name
+      if (!mapped.full_name && mapped.first_name) {
+        mapped.full_name = [mapped.first_name, mapped.last_name]
+          .filter(Boolean)
+          .join(" ");
       }
 
       if (!mapped.full_name) continue;
@@ -236,8 +313,8 @@ export async function POST(request: NextRequest) {
       success: true,
       voterFileId,
       recordCount: totalInserted,
-      totalRows: parsed.data.length,
-      skippedRows: parsed.data.length - totalInserted,
+      totalRows: rows.length,
+      skippedRows: rows.length - totalInserted,
       columnMapping,
     });
   } catch (err) {
