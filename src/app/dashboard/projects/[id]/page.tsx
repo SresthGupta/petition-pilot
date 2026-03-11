@@ -32,6 +32,7 @@ import {
 type Project = Tables<"projects">;
 type Signature = Tables<"signatures">;
 type PetitionSheet = Tables<"petition_sheets">;
+type VoterFile = Tables<"voter_files">;
 
 const statusConfig: Record<string, string> = {
   active: "bg-yellow-100 text-yellow-800",
@@ -67,6 +68,8 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [signatures, setSignatures] = useState<Signature[]>([]);
   const [sheets, setSheets] = useState<PetitionSheet[]>([]);
+  const [voterFiles, setVoterFiles] = useState<VoterFile[]>([]);
+  const [parsingVoterFile, setParsingVoterFile] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -95,8 +98,8 @@ export default function ProjectDetailPage() {
 
     setProject(projectData);
 
-    // Fetch signatures and sheets in parallel
-    const [sigResult, sheetResult] = await Promise.all([
+    // Fetch signatures, sheets, and voter files in parallel
+    const [sigResult, sheetResult, voterFileResult] = await Promise.all([
       supabase
         .from("signatures")
         .select("*")
@@ -107,12 +110,40 @@ export default function ProjectDetailPage() {
         .select("*")
         .eq("project_id", id)
         .order("sheet_number", { ascending: true }),
+      supabase
+        .from("voter_files")
+        .select("*")
+        .eq("project_id", id)
+        .order("created_at", { ascending: true }),
     ]);
 
     setSignatures((sigResult.data ?? []) as unknown as Signature[]);
     setSheets((sheetResult.data ?? []) as unknown as PetitionSheet[]);
+    setVoterFiles((voterFileResult.data ?? []) as unknown as VoterFile[]);
     setLoading(false);
   }, [user, id, supabase]);
+
+  const parseVoterFile = useCallback(async (voterFileId: string) => {
+    setParsingVoterFile(voterFileId);
+    try {
+      // Reset status to pending before re-parsing
+      await supabase
+        .from("voter_files")
+        .update({ parsed_status: "pending" as const })
+        .eq("id", voterFileId);
+
+      const res = await fetch("/api/parse-voters", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voterFileId }),
+      });
+      await res.json();
+      await fetchData();
+    } catch {
+      await fetchData();
+    }
+    setParsingVoterFile(null);
+  }, [supabase, fetchData]);
 
   useEffect(() => {
     fetchData();
@@ -404,6 +435,70 @@ export default function ProjectDetailPage() {
                       >
                         {ocrInfo.label}
                       </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Voter files */}
+          <div className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
+            <h3 className="font-semibold text-[var(--foreground)]">
+              Voter Files
+            </h3>
+            {voterFiles.length === 0 ? (
+              <p className="mt-3 text-sm text-[var(--muted)]">
+                No voter files uploaded yet. Upload a CSV voter roll to enable signature matching.
+              </p>
+            ) : (
+              <div className="mt-4 divide-y divide-[var(--border)]">
+                {voterFiles.map((vf) => {
+                  const parseStatusConfig: Record<string, { label: string; color: string }> = {
+                    pending: { label: "Not Parsed", color: "bg-gray-100 text-gray-600" },
+                    processing: { label: "Processing", color: "bg-yellow-100 text-yellow-800" },
+                    completed: { label: `${vf.record_count.toLocaleString()} voters`, color: "bg-green-100 text-green-800" },
+                    failed: { label: "Failed", color: "bg-red-100 text-red-800" },
+                  };
+                  const parseInfo = parseStatusConfig[vf.parsed_status] ?? parseStatusConfig.pending;
+                  const canParse = vf.parsed_status === "pending" || vf.parsed_status === "failed";
+
+                  return (
+                    <div key={vf.id} className="flex items-center gap-4 py-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-50">
+                        <Table className="h-4 w-4 text-cyan-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="truncate text-sm font-medium text-[var(--foreground)]">
+                          {vf.file_name}
+                        </p>
+                        <p className="text-xs text-[var(--muted)]">
+                          {(vf.file_size / 1024).toFixed(0)} KB
+                        </p>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${parseInfo.color}`}
+                      >
+                        {parseInfo.label}
+                      </span>
+                      {canParse && (
+                        <button
+                          onClick={() => parseVoterFile(vf.id)}
+                          disabled={parsingVoterFile !== null}
+                          className={`shrink-0 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 transition-colors ${
+                            vf.parsed_status === "failed"
+                              ? "bg-red-600 hover:bg-red-700"
+                              : "bg-indigo-600 hover:bg-indigo-700"
+                          }`}
+                        >
+                          {parsingVoterFile === vf.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Table className="h-3.5 w-3.5" />
+                          )}
+                          {vf.parsed_status === "failed" ? "Retry" : "Parse"}
+                        </button>
+                      )}
                     </div>
                   );
                 })}

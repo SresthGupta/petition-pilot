@@ -234,7 +234,7 @@ export default function NewProjectPage() {
 
         updateFileProgress("voter", i, 70);
 
-        const { error: recordError } = await supabase
+        const { data: voterFileRecord, error: recordError } = await supabase
           .from("voter_files")
           .insert({
             project_id: project.id,
@@ -243,12 +243,31 @@ export default function NewProjectPage() {
             file_size: vf.file.size,
             record_count: 0,
             parsed_status: "pending" as const,
-          } as any);
+          } as any)
+          .select()
+          .single();
 
         if (recordError) {
           throw new Error(
             `Failed to save voter file record: ${recordError.message}`
           );
+        }
+
+        updateFileProgress("voter", i, 85);
+
+        // Auto-parse the voter file
+        try {
+          const parseRes = await fetch("/api/parse-voters", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ voterFileId: (voterFileRecord as any).id }),
+          });
+          const parseData = await parseRes.json();
+          if (!parseData.success) {
+            console.warn(`Voter file parse warning: ${parseData.error}`);
+          }
+        } catch (parseErr) {
+          console.warn("Voter file auto-parse failed, can retry from project page:", parseErr);
         }
 
         updateFileProgress("voter", i, 100);
