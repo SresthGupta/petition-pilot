@@ -308,10 +308,19 @@ export default function VerifyPage() {
 
   // ---------- OCR ----------
 
+  const [ocrError, setOcrError] = useState<string | null>(null);
+
   const runOcr = useCallback(
     async (sheetId: string) => {
       setOcrRunning(sheetId);
+      setOcrError(null);
       try {
+        // Reset sheet status to pending so the API can re-process it
+        await supabase
+          .from("petition_sheets")
+          .update({ ocr_status: "pending" as const })
+          .eq("id", sheetId);
+
         const res = await fetch("/api/ocr", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -319,15 +328,18 @@ export default function VerifyPage() {
         });
         const data = await res.json();
         if (data.success) {
-          // Refresh signatures and sheets
           await Promise.all([fetchSignatures(), fetchSheets()]);
+        } else {
+          setOcrError(data.error || "OCR failed. Click the button to retry.");
+          await fetchSheets(); // refresh to show "failed" status
         }
       } catch {
-        // Silent fail
+        setOcrError("OCR request failed. Click the button to retry.");
+        await fetchSheets();
       }
       setOcrRunning(null);
     },
-    [fetchSignatures, fetchSheets]
+    [fetchSignatures, fetchSheets, supabase]
   );
 
   // ---------- Keyboard Shortcuts ----------
@@ -397,7 +409,9 @@ export default function VerifyPage() {
   const currentSheetNumber = currentSheet?.sheet_number ?? 1;
 
   // Pending OCR sheets
-  const pendingOcrSheets = sheets.filter((sh) => sh.ocr_status === "pending");
+  const pendingOcrSheets = sheets.filter(
+    (sh) => sh.ocr_status === "pending" || sh.ocr_status === "failed"
+  );
 
   // Best match and alternatives
   const bestMatch = matches.length > 0 ? matches[0] : null;
@@ -462,7 +476,7 @@ export default function VerifyPage() {
             {pendingOcrSheets.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">
-                  {pendingOcrSheets.length} sheet{pendingOcrSheets.length > 1 ? "s" : ""} awaiting OCR
+                  {pendingOcrSheets.length} sheet{pendingOcrSheets.length > 1 ? "s" : ""} {pendingOcrSheets.some((s) => s.ocr_status === "failed") ? "need OCR (includes failed)" : "awaiting OCR"}
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {pendingOcrSheets.map((sheet) => (
@@ -470,17 +484,29 @@ export default function VerifyPage() {
                       key={sheet.id}
                       onClick={() => runOcr(sheet.id)}
                       disabled={ocrRunning !== null}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white disabled:opacity-50 transition-colors ${
+                        sheet.ocr_status === "failed"
+                          ? "bg-red-600 hover:bg-red-700"
+                          : "bg-indigo-600 hover:bg-indigo-700"
+                      }`}
                     >
                       {ocrRunning === sheet.id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : sheet.ocr_status === "failed" ? (
+                        <AlertTriangle className="h-4 w-4" />
                       ) : (
                         <Upload className="h-4 w-4" />
                       )}
-                      Run OCR - Sheet #{sheet.sheet_number}
+                      {sheet.ocr_status === "failed" ? "Retry" : "Run"} OCR - Sheet #{sheet.sheet_number}
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {ocrError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {ocrError}
               </div>
             )}
 
@@ -555,7 +581,7 @@ export default function VerifyPage() {
               ) : (
                 <FileText className="h-3.5 w-3.5" />
               )}
-              Run OCR ({pendingOcrSheets.length})
+              {pendingOcrSheets[0]?.ocr_status === "failed" ? "Retry" : "Run"} OCR ({pendingOcrSheets.length})
             </button>
           )}
 
