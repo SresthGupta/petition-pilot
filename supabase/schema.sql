@@ -120,6 +120,7 @@ CREATE INDEX idx_voters_project_id ON public.voters(project_id);
 CREATE INDEX idx_voters_full_name ON public.voters(full_name);
 CREATE INDEX idx_activity_log_user_id ON public.activity_log(user_id);
 CREATE INDEX idx_activity_log_project_id ON public.activity_log(project_id);
+CREATE INDEX idx_signatures_project_status ON public.signatures(project_id, status);
 
 -- Row Level Security
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -147,6 +148,8 @@ CREATE POLICY "Users can insert own sheets" ON public.petition_sheets FOR INSERT
   WITH CHECK (EXISTS (SELECT 1 FROM public.projects WHERE projects.id = petition_sheets.project_id AND projects.user_id = auth.uid()));
 CREATE POLICY "Users can update own sheets" ON public.petition_sheets FOR UPDATE
   USING (EXISTS (SELECT 1 FROM public.projects WHERE projects.id = petition_sheets.project_id AND projects.user_id = auth.uid()));
+CREATE POLICY "Users can delete own sheets" ON public.petition_sheets FOR DELETE
+  USING (EXISTS (SELECT 1 FROM public.projects WHERE projects.id = petition_sheets.project_id AND projects.user_id = auth.uid()));
 
 -- Voter files: access through project ownership
 CREATE POLICY "Users can view own voter files" ON public.voter_files FOR SELECT
@@ -154,6 +157,8 @@ CREATE POLICY "Users can view own voter files" ON public.voter_files FOR SELECT
 CREATE POLICY "Users can insert own voter files" ON public.voter_files FOR INSERT
   WITH CHECK (EXISTS (SELECT 1 FROM public.projects WHERE projects.id = voter_files.project_id AND projects.user_id = auth.uid()));
 CREATE POLICY "Users can update own voter files" ON public.voter_files FOR UPDATE
+  USING (EXISTS (SELECT 1 FROM public.projects WHERE projects.id = voter_files.project_id AND projects.user_id = auth.uid()));
+CREATE POLICY "Users can delete own voter files" ON public.voter_files FOR DELETE
   USING (EXISTS (SELECT 1 FROM public.projects WHERE projects.id = voter_files.project_id AND projects.user_id = auth.uid()));
 
 -- Voters: access through project ownership

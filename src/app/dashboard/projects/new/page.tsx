@@ -457,6 +457,7 @@ export default function NewProjectPage() {
               <input
                 type="date"
                 value={deadline}
+                min={new Date().toISOString().split("T")[0]}
                 onChange={(e) => setDeadline(e.target.value)}
                 className={inputClass}
               />

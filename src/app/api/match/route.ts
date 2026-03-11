@@ -65,7 +65,7 @@ function computeNameScore(extracted: string, voter: string): number {
     aParts.length >= 2 &&
     bParts.length >= 2 &&
     aParts[aParts.length - 1] === bParts[bParts.length - 1] &&
-    aParts[0][0] === bParts[0][0]
+    aParts[0].length > 0 && bParts[0].length > 0 && aParts[0][0] === bParts[0][0]
   ) {
     return 78;
   }
@@ -75,7 +75,7 @@ function computeNameScore(extracted: string, voter: string): number {
   const bSet = new Set(bParts);
   const intersection = [...aSet].filter((t) => bSet.has(t));
   const union = new Set([...aSet, ...bSet]);
-  const jaccardScore = (intersection.length / union.size) * 100;
+  const jaccardScore = union.size > 0 ? (intersection.length / union.size) * 100 : 0;
 
   // Levenshtein similarity
   const editDist = levenshtein(a, b);
@@ -110,7 +110,7 @@ function computeAddressScore(extracted: string, voter: string): number {
   const intersection = [...aSet].filter((t) => bSet.has(t));
   const union = new Set([...aSet, ...bSet]);
 
-  return Math.round((intersection.length / union.size) * 100);
+  return union.size > 0 ? Math.round((intersection.length / union.size) * 100) : 0;
 }
 
 /**

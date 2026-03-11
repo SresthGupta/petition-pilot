@@ -1197,9 +1197,10 @@ export default function VerifyPage() {
               ${actionFlash === "Invalid" ? "bg-red-500 text-white" : ""}
               ${actionFlash === "Flagged" ? "bg-amber-500 text-white" : ""}
               ${actionFlash === "Skipped" ? "bg-gray-400 text-white" : ""}
+              ${actionFlash === "red" ? "bg-red-600 text-white" : ""}
             `}
           >
-            {actionFlash}
+            {actionFlash === "red" ? "Error" : actionFlash}
           </div>
         </div>
       )}

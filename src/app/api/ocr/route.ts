@@ -93,11 +93,15 @@ Be thorough. Extract every line that has any writing, even if partially illegibl
     // If Gemini returned non-JSON, try to salvage it
     const jsonMatch = textContent.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return {
-        signatures: Array.isArray(parsed.signatures) ? parsed.signatures : [],
-        rawText: parsed.rawText || "",
-      };
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          signatures: Array.isArray(parsed.signatures) ? parsed.signatures : [],
+          rawText: parsed.rawText || "",
+        };
+      } catch {
+        // Salvage parse also failed, fall through
+      }
     }
     throw new Error("Failed to parse Gemini response as JSON");
   }

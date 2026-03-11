@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const supabase = createClient();
 
-  const fetchProfile = useCallback(async (userId: string, retries = 3) => {
+  const fetchProfile = useCallback(async (userId: string, retries = 5) => {
     for (let i = 0; i < retries; i++) {
       const { data } = await supabase
         .from("profiles")
@@ -38,10 +38,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       // Profile may not exist yet (trigger race condition after signup)
+      // Backoff: 300ms, 600ms, 1200ms, 2400ms (total ~4.5s)
       if (i < retries - 1) {
-        await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+        await new Promise((r) => setTimeout(r, 300 * Math.pow(2, i)));
       }
     }
+    console.warn("Failed to fetch profile after retries for user:", userId);
   }, [supabase]);
 
   useEffect(() => {
