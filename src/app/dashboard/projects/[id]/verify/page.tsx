@@ -645,8 +645,8 @@ export default function VerifyPage() {
             </div>
           </div>
 
-          {/* Petition sheet image (if available) */}
-          {sheetImageUrl && (
+          {/* Petition sheet preview (images only, skip PDFs) */}
+          {sheetImageUrl && currentSheet && /\.(png|jpe?g|gif|webp|bmp|tiff?)$/i.test(currentSheet.file_name) && (
             <div className="border-b border-gray-100 bg-white p-3">
               <div className="rounded-lg border border-gray-200 overflow-hidden max-h-48">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
