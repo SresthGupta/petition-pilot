@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Petition Pilot
+
+AI-powered petition signature verification platform. 10x faster than manual validation with OCR, intelligent voter matching, real-time analytics, and automated compliance reports.
+
+## Features
+
+### Core Platform
+- **AI-Powered OCR** - Reads handwritten signatures from scanned petition sheets using Tesseract.js
+- **Smart Voter Matching** - Fuzzy matching against voter registration files with confidence scoring (Fuse.js)
+- **Verification Interface** - Split-screen workspace with keyboard shortcuts for rapid signature validation
+- **Batch Processing** - Upload and process entire petition drives at once
+- **Team Collaboration** - Multi-user projects with role-based access
+
+### Extra Features (Beyond Competitors)
+- **Real-Time Analytics Dashboard** - Live progress tracking, accuracy rates, circulator performance breakdowns, cost savings metrics, and jurisdiction insights
+- **Automated Compliance Reports** - Jurisdiction-specific validation rules engine, cross-project duplicate signature detection, exportable legal-format PDF reports, and county clerk submission formats
+
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS v4
+- **Charts**: Recharts
+- **OCR**: Tesseract.js (integration ready)
+- **Matching**: Fuse.js (integration ready)
+- **Animations**: Framer Motion
+- **UI Primitives**: Radix UI
+- **Icons**: Lucide React
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+# Install dependencies
+npm install
+
+# Run development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# Build for production
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to see the landing page.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+src/
+  app/
+    page.tsx                          # Landing page
+    pricing/page.tsx                  # Pricing page
+    about/page.tsx                    # About page
+    contact/page.tsx                  # Contact page
+    login/page.tsx                    # Login page
+    signup/page.tsx                   # Signup page
+    dashboard/
+      layout.tsx                      # Dashboard sidebar layout
+      page.tsx                        # Dashboard home
+      analytics/page.tsx              # Analytics dashboard (NEW)
+      compliance/page.tsx             # Compliance reports (NEW)
+      settings/page.tsx               # User settings
+      projects/
+        page.tsx                      # Projects list
+        new/page.tsx                  # New project wizard
+        [id]/page.tsx                 # Project detail
+        [id]/verify/page.tsx          # Signature verification interface
+    api/
+      auth/route.ts                   # Auth API stub
+      projects/route.ts               # Projects API stub
+      verify/route.ts                 # Verification API stub
+  components/
+    layout/
+      navbar.tsx                      # Marketing navbar
+      footer.tsx                      # Marketing footer
+      marketing-layout.tsx            # Marketing page wrapper
+    ui/
+      button.tsx                      # Button component
+      card.tsx                        # Card components
+  lib/
+    utils.ts                          # Utility functions
+```
 
-## Learn More
+## Pricing
 
-To learn more about Next.js, take a look at the following resources:
+| Plan | Per Signature | Setup Fee | Includes |
+|------|--------------|-----------|----------|
+| Starter | $0.10 | $199 | AI OCR, voter matching, basic dashboard |
+| Professional | $0.30 | $399 | Full-service verification, compliance reports, analytics |
+| Enterprise | Custom | Custom | SLA, dedicated support, on-premise option |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT

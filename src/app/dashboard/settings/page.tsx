@@ -1,0 +1,344 @@
+"use client";
+
+import { useState } from "react";
+import {
+  User,
+  Lock,
+  Bell,
+  Key,
+  Users,
+  Trash2,
+  Copy,
+  RefreshCw,
+  Plus,
+  Mail,
+  BarChart3,
+  AlertTriangle,
+  Shield,
+} from "lucide-react";
+
+const mockTeamMembers = [
+  {
+    name: "Sarah Chen",
+    email: "sarah@campaign.org",
+    role: "Admin",
+    initials: "SC",
+  },
+  {
+    name: "Marcus Rivera",
+    email: "marcus@campaign.org",
+    role: "Verifier",
+    initials: "MR",
+  },
+];
+
+function Toggle({
+  enabled,
+  onToggle,
+}: {
+  enabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
+        enabled ? "bg-indigo-600" : "bg-gray-200"
+      }`}
+    >
+      <span
+        className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${
+          enabled ? "translate-x-5" : "translate-x-0"
+        }`}
+      />
+    </button>
+  );
+}
+
+export default function SettingsPage() {
+  // Profile
+  const [name, setName] = useState("Demo User");
+  const [email, setEmail] = useState("demo@example.com");
+  const [organization, setOrganization] = useState("Campaign for Progress");
+
+  // Password
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  // Notifications
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [weeklyReports, setWeeklyReports] = useState(true);
+  const [signatureAlerts, setSignatureAlerts] = useState(false);
+
+  // API Key
+  const [apiKey] = useState("pp_live_sk_a1b2c3d4e5f6...x7y8z9");
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Manage your account, team, and preferences
+        </p>
+      </div>
+
+      {/* Profile Section */}
+      <section className="rounded-xl border border-gray-200 bg-white">
+        <div className="flex items-center gap-3 border-b border-gray-100 px-6 py-4">
+          <User className="h-5 w-5 text-gray-400" />
+          <h2 className="text-base font-semibold text-gray-900">Profile</h2>
+        </div>
+        <div className="space-y-4 p-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Full name
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Organization
+            </label>
+            <input
+              type="text"
+              value={organization}
+              onChange={(e) => setOrganization(e.target.value)}
+              className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+          </div>
+          <div className="flex justify-end pt-2">
+            <button className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Password Section */}
+      <section className="rounded-xl border border-gray-200 bg-white">
+        <div className="flex items-center gap-3 border-b border-gray-100 px-6 py-4">
+          <Lock className="h-5 w-5 text-gray-400" />
+          <h2 className="text-base font-semibold text-gray-900">
+            Change Password
+          </h2>
+        </div>
+        <div className="space-y-4 p-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Current password
+            </label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              New password
+            </label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Confirm new password
+            </label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+          </div>
+          <div className="flex justify-end pt-2">
+            <button className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
+              Update Password
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Notification Preferences */}
+      <section className="rounded-xl border border-gray-200 bg-white">
+        <div className="flex items-center gap-3 border-b border-gray-100 px-6 py-4">
+          <Bell className="h-5 w-5 text-gray-400" />
+          <h2 className="text-base font-semibold text-gray-900">
+            Notification Preferences
+          </h2>
+        </div>
+        <div className="divide-y divide-gray-100">
+          <div className="flex items-center justify-between px-6 py-4">
+            <div className="flex items-center gap-3">
+              <Mail className="h-4 w-4 text-gray-400" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  Email notifications
+                </p>
+                <p className="text-xs text-gray-500">
+                  Receive updates about your projects via email
+                </p>
+              </div>
+            </div>
+            <Toggle
+              enabled={emailNotifications}
+              onToggle={() => setEmailNotifications(!emailNotifications)}
+            />
+          </div>
+          <div className="flex items-center justify-between px-6 py-4">
+            <div className="flex items-center gap-3">
+              <BarChart3 className="h-4 w-4 text-gray-400" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  Weekly reports
+                </p>
+                <p className="text-xs text-gray-500">
+                  Get a summary of verification activity each week
+                </p>
+              </div>
+            </div>
+            <Toggle
+              enabled={weeklyReports}
+              onToggle={() => setWeeklyReports(!weeklyReports)}
+            />
+          </div>
+          <div className="flex items-center justify-between px-6 py-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-4 w-4 text-gray-400" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  Signature alerts
+                </p>
+                <p className="text-xs text-gray-500">
+                  Notify when flagged signatures exceed threshold
+                </p>
+              </div>
+            </div>
+            <Toggle
+              enabled={signatureAlerts}
+              onToggle={() => setSignatureAlerts(!signatureAlerts)}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* API Keys */}
+      <section className="rounded-xl border border-gray-200 bg-white">
+        <div className="flex items-center gap-3 border-b border-gray-100 px-6 py-4">
+          <Key className="h-5 w-5 text-gray-400" />
+          <h2 className="text-base font-semibold text-gray-900">API Keys</h2>
+        </div>
+        <div className="p-6">
+          <p className="text-sm text-gray-500 mb-4">
+            Use your API key to integrate PetitionPilot with external tools and
+            scripts.
+          </p>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 font-mono text-sm text-gray-600">
+              {apiKey}
+            </div>
+            <button className="rounded-lg border border-gray-300 p-2.5 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors">
+              <Copy className="h-4 w-4" />
+            </button>
+            <button className="rounded-lg border border-gray-300 p-2.5 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors">
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-gray-400">
+            Keep your API key secret. Do not share it publicly or commit it to
+            version control.
+          </p>
+        </div>
+      </section>
+
+      {/* Team Members */}
+      <section className="rounded-xl border border-gray-200 bg-white">
+        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <Users className="h-5 w-5 text-gray-400" />
+            <h2 className="text-base font-semibold text-gray-900">
+              Team Members
+            </h2>
+          </div>
+          <button className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
+            <Plus className="h-3.5 w-3.5" />
+            Invite Member
+          </button>
+        </div>
+        <div className="divide-y divide-gray-100">
+          {mockTeamMembers.map((member) => (
+            <div
+              key={member.email}
+              className="flex items-center justify-between px-6 py-4"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-600">
+                  {member.initials}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    {member.name}
+                  </p>
+                  <p className="text-xs text-gray-500">{member.email}</p>
+                </div>
+              </div>
+              <span
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                  member.role === "Admin"
+                    ? "bg-indigo-50 text-indigo-700"
+                    : "bg-gray-100 text-gray-600"
+                }`}
+              >
+                {member.role}
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Danger Zone */}
+      <section className="rounded-xl border border-red-200 bg-white">
+        <div className="flex items-center gap-3 border-b border-red-100 px-6 py-4">
+          <Shield className="h-5 w-5 text-red-400" />
+          <h2 className="text-base font-semibold text-red-900">Danger Zone</h2>
+        </div>
+        <div className="flex items-center justify-between p-6">
+          <div>
+            <p className="text-sm font-medium text-gray-900">Delete account</p>
+            <p className="text-xs text-gray-500">
+              Permanently delete your account and all associated data. This
+              action cannot be undone.
+            </p>
+          </div>
+          <button className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete Account
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
