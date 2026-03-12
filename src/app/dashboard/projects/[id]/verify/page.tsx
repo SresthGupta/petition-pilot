@@ -11,8 +11,6 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
-  Save,
-  Download,
   Search,
   CheckCircle2,
   XCircle,
@@ -31,6 +29,11 @@ import {
   Loader2,
   FileText,
   Upload,
+  Maximize2,
+  Minimize2,
+  Type,
+  RotateCcw,
+  Pencil,
 } from "lucide-react";
 
 // ---------- Types ----------
@@ -102,12 +105,23 @@ export default function VerifyPage() {
   const [actionFlash, setActionFlash] = useState<string | null>(null);
   const [ocrRunning, setOcrRunning] = useState<string | null>(null); // sheet ID being processed
   const [verifyingAction, setVerifyingAction] = useState(false);
+  const [imageExpanded, setImageExpanded] = useState(false);
+  const [editedName, setEditedName] = useState("");
+  const [editedAddress, setEditedAddress] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const isSearchFocused = useRef(false);
   const [startTime] = useState(Date.now());
   const [actionsCount, setActionsCount] = useState(0);
 
   const current = signatures[currentIndex] ?? null;
+
+  // Sync editable fields when current signature changes
+  useEffect(() => {
+    if (current) {
+      setEditedName(current.extracted_name || "");
+      setEditedAddress(current.extracted_address || "");
+    }
+  }, [current?.id, current?.extracted_name, current?.extracted_address]);
 
   // Fuse.js instance for client-side manual search
   const fuseRef = useRef<Fuse<Tables<"voters">> | null>(null);
@@ -179,14 +193,18 @@ export default function VerifyPage() {
   // ---------- Voter Matching ----------
 
   const fetchMatches = useCallback(
-    async (signatureId: string) => {
+    async (signatureId: string, overrideName?: string, overrideAddress?: string) => {
       setMatchesLoading(true);
       setSelectedMatchIndex(null);
       try {
+        const body: Record<string, string> = { projectId, signatureId };
+        if (overrideName !== undefined) body.overrideName = overrideName;
+        if (overrideAddress !== undefined) body.overrideAddress = overrideAddress;
+
         const res = await fetch("/api/match", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectId, signatureId }),
+          body: JSON.stringify(body),
         });
         const data = await res.json();
         if (data.success && data.matches) {
@@ -376,6 +394,9 @@ export default function VerifyPage() {
         case "f":
           markStatus("flagged");
           break;
+        case "r":
+          if (current) fetchMatches(current.id, editedName, editedAddress);
+          break;
         case "arrowright":
           goTo(currentIndex + 1);
           break;
@@ -390,7 +411,7 @@ export default function VerifyPage() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [currentIndex, markStatus, goTo]);
+  }, [currentIndex, markStatus, goTo, current, fetchMatches, editedName, editedAddress]);
 
   // ---------- Manual Search ----------
 
@@ -598,17 +619,6 @@ export default function VerifyPage() {
             </button>
           )}
 
-          {/* Actions */}
-          <div className="flex items-center gap-2">
-            <button className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors">
-              <Save className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Save</span>
-            </button>
-            <button className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors">
-              <Download className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Export</span>
-            </button>
-          </div>
         </div>
       </div>
 
@@ -653,16 +663,193 @@ export default function VerifyPage() {
             </div>
           </div>
 
-          {/* Petition sheet preview (images only, skip PDFs) */}
-          {sheetImageUrl && currentSheet && /\.(png|jpe?g|gif|webp|bmp|tiff?)$/i.test(currentSheet.file_name) && (
-            <div className="border-b border-gray-100 bg-white p-3">
-              <div className="rounded-lg border border-gray-200 overflow-hidden max-h-48">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={sheetImageUrl}
-                  alt={`Petition sheet ${currentSheetNumber}`}
-                  className="w-full object-contain"
-                />
+          {/* Image + Extracted Text Section */}
+          {current && (
+            <div className="border-b border-gray-200 bg-white overflow-y-auto" style={{ maxHeight: imageExpanded ? "70vh" : "45vh" }}>
+              {/* Image: Handwritten petition entry */}
+              <div className="border-b border-gray-100 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-base font-bold text-gray-900">Image</h3>
+                    <p className="text-xs text-gray-500">Handwritten text of the given signature.</p>
+                  </div>
+                  {sheetImageUrl && currentSheet && /\.(png|jpe?g|gif|webp|bmp|tiff?)$/i.test(currentSheet.file_name) && (
+                    <button
+                      onClick={() => setImageExpanded(!imageExpanded)}
+                      className="rounded-lg border border-gray-200 p-1.5 text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-colors"
+                      title={imageExpanded ? "Collapse image" : "Expand image"}
+                    >
+                      {imageExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                    </button>
+                  )}
+                </div>
+
+                {sheetImageUrl && currentSheet && /\.(png|jpe?g|gif|webp|bmp|tiff?)$/i.test(currentSheet.file_name) ? (
+                  (() => {
+                    // Calculate crop position based on line number
+                    const sigsOnSheet = signatures.filter((s) => s.sheet_id === current.sheet_id);
+                    const totalLines = Math.max(sigsOnSheet.length, current.line_number ?? 1);
+                    const lineNum = current.line_number ?? 1;
+                    // Petition sheets: ~12% header, rows fill the rest evenly
+                    const headerPct = 12;
+                    const bodyPct = 100 - headerPct;
+                    const rowHeight = bodyPct / totalLines;
+                    // Center on the current row
+                    const yPct = Math.min(Math.max(headerPct + (lineNum - 0.5) * rowHeight, 0), 100);
+
+                    return (
+                      <div className="space-y-2">
+                        {/* Cropped view of the actual petition entry row */}
+                        <div
+                          className="rounded-lg border border-gray-200 overflow-hidden bg-gray-50 relative cursor-pointer"
+                          style={{ height: imageExpanded ? "200px" : "120px" }}
+                          onClick={() => setImageExpanded(!imageExpanded)}
+                          title="Click to expand/collapse"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={sheetImageUrl}
+                            alt={`Entry row ${lineNum} on sheet ${currentSheetNumber}`}
+                            className="w-full absolute left-0"
+                            style={{
+                              height: `${totalLines * (imageExpanded ? 200 : 120)}px`,
+                              minHeight: "400px",
+                              objectFit: "cover",
+                              objectPosition: `center ${yPct}%`,
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                            }}
+                          />
+                          {/* Line indicator badge */}
+                          <div className="absolute top-2 right-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
+                            Line {lineNum}
+                          </div>
+                        </div>
+
+                        {/* Full sheet toggle */}
+                        <details className="group">
+                          <summary className="cursor-pointer text-[11px] font-medium text-indigo-500 hover:text-indigo-600 transition-colors flex items-center gap-1">
+                            <Eye className="h-3 w-3" />
+                            View full petition sheet
+                          </summary>
+                          <div className="mt-2 rounded-lg border border-gray-200 overflow-hidden max-h-[500px] overflow-y-auto">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={sheetImageUrl}
+                              alt={`Petition sheet ${currentSheetNumber}`}
+                              className="w-full object-contain"
+                            />
+                          </div>
+                        </details>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-8 text-center">
+                    <FileText className="mx-auto h-10 w-10 text-gray-300" />
+                    <p className="mt-2 text-sm text-gray-400">
+                      {currentSheet ? "PDF preview not available" : "No sheet uploaded"}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Extracted Text: Editable fields */}
+              <div className="p-4">
+                <div className="mb-3">
+                  <h3 className="text-base font-bold text-gray-900">Extracted Text</h3>
+                  <p className="text-xs text-gray-500">
+                    Generated by OCR. Modify the text manually below to re-generate best matches if it appears off.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {/* Editable Name */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Name</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={editedName}
+                        onChange={(e) => setEditedName(e.target.value)}
+                        onFocus={() => { isSearchFocused.current = true; }}
+                        onBlur={() => { isSearchFocused.current = false; }}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 pr-10 text-sm text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-[10px] font-bold text-gray-400">
+                        N
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Editable Address */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Address</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={editedAddress}
+                        onChange={(e) => setEditedAddress(e.target.value)}
+                        onFocus={() => { isSearchFocused.current = true; }}
+                        onBlur={() => { isSearchFocused.current = false; }}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 pr-10 text-sm text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-[10px] font-bold text-gray-400">
+                        A
+                      </div>
+                    </div>
+                  </div>
+
+                  {current.extracted_date && (
+                    <div>
+                      <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Date Signed</label>
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600">
+                        {current.extracted_date}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Regenerate Best Matches button */}
+                  <button
+                    onClick={() => {
+                      if (current) {
+                        fetchMatches(current.id, editedName, editedAddress);
+                      }
+                    }}
+                    disabled={matchesLoading}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 transition-all"
+                  >
+                    {matchesLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RotateCcw className="h-4 w-4" />
+                    )}
+                    Regenerate Best Matches
+                    <div className="flex h-5 w-5 items-center justify-center rounded bg-indigo-500/50 text-[10px] font-bold">
+                      R
+                    </div>
+                  </button>
+
+                  {/* Show edit indicator if text was modified */}
+                  {(editedName !== (current.extracted_name || "") || editedAddress !== (current.extracted_address || "")) && (
+                    <p className="flex items-center gap-1.5 text-[11px] text-amber-600">
+                      <Pencil className="h-3 w-3" />
+                      Text has been modified from original OCR. Click Regenerate to update matches.
+                    </p>
+                  )}
+                </div>
+
+                {/* Raw OCR text snippet if available */}
+                {currentSheet?.ocr_raw_text && (
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-[11px] font-medium text-indigo-500 hover:text-indigo-600 transition-colors">
+                      View full OCR output for this sheet
+                    </summary>
+                    <pre className="mt-1.5 max-h-32 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3 text-[11px] leading-relaxed text-gray-600 whitespace-pre-wrap font-mono">
+                      {currentSheet.ocr_raw_text}
+                    </pre>
+                  </details>
+                )}
               </div>
             </div>
           )}
@@ -687,7 +874,7 @@ export default function VerifyPage() {
                     key={sig.id}
                     onClick={() => goTo(idx)}
                     className={`
-                      grid w-full grid-cols-[48px_1fr_1fr_100px] gap-0 items-center px-4 py-3.5 text-left text-sm
+                      grid w-full grid-cols-[48px_1fr_1fr_100px] gap-0 items-center px-4 py-2.5 text-left text-sm
                       border-b border-gray-50 transition-all duration-200 group relative
                       ${
                         isActive
@@ -708,14 +895,14 @@ export default function VerifyPage() {
 
                     {/* Name */}
                     <span
-                      className={`font-serif italic ${isActive ? "text-gray-900 font-semibold" : "text-gray-700"}`}
+                      className={`font-serif italic truncate ${isActive ? "text-gray-900 font-semibold" : "text-gray-700"}`}
                       style={{ fontFamily: "'Georgia', 'Times New Roman', serif", letterSpacing: "0.01em" }}
                     >
                       {sig.extracted_name}
                     </span>
 
                     {/* Address */}
-                    <span className={`text-xs ${isActive ? "text-gray-700" : "text-gray-500"}`}>
+                    <span className={`text-xs truncate ${isActive ? "text-gray-700" : "text-gray-500"}`}>
                       {sig.extracted_address}
                     </span>
 
@@ -740,35 +927,15 @@ export default function VerifyPage() {
           <div className="flex-1 space-y-4 p-5">
             {current ? (
               <>
-                {/* Currently selected signature */}
-                <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/80 to-white p-4">
+                {/* Currently selected signature (compact) */}
+                <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/80 to-white px-4 py-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-400">
-                      Selected Signature
+                    <p className="text-sm font-bold text-gray-900" style={{ fontFamily: "'Georgia', serif" }}>
+                      {editedName || current.extracted_name}
                     </p>
                     <span className="text-xs text-gray-400">#{current.line_number}</span>
                   </div>
-                  <p className="mt-2 text-lg font-bold text-gray-900" style={{ fontFamily: "'Georgia', serif" }}>
-                    {current.extracted_name}
-                  </p>
-                  <p className="mt-0.5 text-sm text-gray-500">{current.extracted_address}</p>
-                  {current.extracted_date && (
-                    <p className="mt-0.5 text-xs text-gray-400">Date: {current.extracted_date}</p>
-                  )}
-                  <div className="mt-2">
-                    {(() => {
-                      const cfg = statusConfig[current.status as VerificationStatus] ?? statusConfig.pending;
-                      const StatusIcon = cfg.icon;
-                      return (
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${cfg.bg} ${cfg.text} ${cfg.border}`}
-                        >
-                          <StatusIcon className="h-3.5 w-3.5" />
-                          {cfg.label}
-                        </span>
-                      );
-                    })()}
-                  </div>
+                  <p className="mt-0.5 text-xs text-gray-500">{editedAddress || current.extracted_address}</p>
                 </div>
 
                 {/* Previously Matched Voter (shown when navigating back to a verified signature) */}
@@ -1124,6 +1291,12 @@ export default function VerifyPage() {
                       <span>Search Voter File</span>
                       <kbd className="rounded border border-gray-200 bg-white px-1.5 py-0.5 font-mono text-[10px]">
                         /
+                      </kbd>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Regenerate Matches</span>
+                      <kbd className="rounded border border-gray-200 bg-white px-1.5 py-0.5 font-mono text-[10px]">
+                        R
                       </kbd>
                     </div>
                   </div>

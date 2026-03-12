@@ -94,10 +94,10 @@ export default function Home() {
                   <ArrowRight className="w-4 h-4" />
                 </Link>
                 <Link
-                  href="#demo"
+                  href="/contact"
                   className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl border-2 border-border text-foreground font-semibold text-base hover:border-primary/40 hover:bg-primary/5 transition-all"
                 >
-                  Watch Demo
+                  Request Demo
                 </Link>
               </div>
             </div>

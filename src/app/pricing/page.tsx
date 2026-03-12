@@ -232,7 +232,7 @@ export default function PricingPage() {
                 </div>
 
                 <a
-                  href="#"
+                  href={tier.name === "Enterprise" ? "/contact" : "/signup"}
                   className={`mb-8 flex h-11 items-center justify-center rounded-lg text-sm font-semibold transition-colors ${
                     tier.highlighted
                       ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
@@ -318,7 +318,7 @@ export default function PricingPage() {
       </section>
 
       {/* FAQ */}
-      <section className="py-20">
+      <section id="faq" className="py-20">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <h2 className="text-center text-3xl font-bold text-gray-900">
             Frequently Asked Questions
@@ -372,14 +372,14 @@ export default function PricingPage() {
           </p>
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <a
-              href="#"
+              href="/signup"
               className="inline-flex h-12 items-center gap-2 rounded-lg bg-white px-6 text-sm font-semibold text-indigo-600 shadow-sm hover:bg-indigo-50 transition-colors"
             >
               Get Started Free
               <ArrowRight className="h-4 w-4" />
             </a>
             <a
-              href="#"
+              href="/contact"
               className="inline-flex h-12 items-center gap-2 rounded-lg border border-indigo-400 px-6 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors"
             >
               Contact Sales

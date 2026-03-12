@@ -10,9 +10,6 @@ import {
   Key,
   Users,
   Trash2,
-  Copy,
-  RefreshCw,
-  Plus,
   Mail,
   BarChart3,
   AlertTriangle,
@@ -78,21 +75,6 @@ function Toast({
   );
 }
 
-const mockTeamMembers = [
-  {
-    name: "Sarah Chen",
-    email: "sarah@campaign.org",
-    role: "Admin",
-    initials: "SC",
-  },
-  {
-    name: "Marcus Rivera",
-    email: "marcus@campaign.org",
-    role: "Verifier",
-    initials: "MR",
-  },
-];
-
 export default function SettingsPage() {
   const { user, profile, refreshProfile } = useAuth();
   const supabase = createClient();
@@ -112,9 +94,6 @@ export default function SettingsPage() {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [weeklyReports, setWeeklyReports] = useState(true);
   const [signatureAlerts, setSignatureAlerts] = useState(false);
-
-  // API Key
-  const [apiKey] = useState("pp_live_sk_a1b2c3d4e5f6...x7y8z9");
 
   // Toast
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -309,6 +288,9 @@ export default function SettingsPage() {
           <h2 className="text-base font-semibold text-gray-900">
             Notification Preferences
           </h2>
+          <span className="ml-auto rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+            Coming Soon
+          </span>
         </div>
         <div className="divide-y divide-gray-100">
           <div className="flex items-center justify-between px-6 py-4">
@@ -372,24 +354,8 @@ export default function SettingsPage() {
           <h2 className="text-base font-semibold text-gray-900">API Keys</h2>
         </div>
         <div className="p-6">
-          <p className="text-sm text-gray-500 mb-4">
-            Use your API key to integrate PetitionPilot with external tools and
-            scripts.
-          </p>
-          <div className="flex items-center gap-3">
-            <div className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 font-mono text-sm text-gray-600">
-              {apiKey}
-            </div>
-            <button className="rounded-lg border border-gray-300 p-2.5 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors">
-              <Copy className="h-4 w-4" />
-            </button>
-            <button className="rounded-lg border border-gray-300 p-2.5 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors">
-              <RefreshCw className="h-4 w-4" />
-            </button>
-          </div>
-          <p className="mt-3 text-xs text-gray-400">
-            Keep your API key secret. Do not share it publicly or commit it to
-            version control.
+          <p className="text-sm text-gray-500">
+            API access will be available on Professional and Enterprise plans. Stay tuned.
           </p>
         </div>
       </section>
@@ -403,39 +369,14 @@ export default function SettingsPage() {
               Team Members
             </h2>
           </div>
-          <button className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
-            <Plus className="h-3.5 w-3.5" />
-            Invite Member
-          </button>
+          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+            Coming Soon
+          </span>
         </div>
-        <div className="divide-y divide-gray-100">
-          {mockTeamMembers.map((member) => (
-            <div
-              key={member.email}
-              className="flex items-center justify-between px-6 py-4"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-600">
-                  {member.initials}
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-900">
-                    {member.name}
-                  </p>
-                  <p className="text-xs text-gray-500">{member.email}</p>
-                </div>
-              </div>
-              <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  member.role === "Admin"
-                    ? "bg-indigo-50 text-indigo-700"
-                    : "bg-gray-100 text-gray-600"
-                }`}
-              >
-                {member.role}
-              </span>
-            </div>
-          ))}
+        <div className="p-6">
+          <p className="text-sm text-gray-500">
+            Team collaboration features are coming soon. You&apos;ll be able to invite team members and assign roles.
+          </p>
         </div>
       </section>
 
@@ -453,10 +394,13 @@ export default function SettingsPage() {
               action cannot be undone.
             </p>
           </div>
-          <button className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
+          <a
+            href="mailto:hello@petitionpilot.com?subject=Account%20Deletion%20Request"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+          >
             <Trash2 className="h-3.5 w-3.5" />
-            Delete Account
-          </button>
+            Request Deletion
+          </a>
         </div>
       </section>
     </div>

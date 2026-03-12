@@ -238,12 +238,12 @@ function LoginPageInner() {
 
             {/* Forgot password */}
             <div className="flex items-center justify-end">
-              <Link
-                href="#"
+              <a
+                href="mailto:hello@petitionpilot.com?subject=Password%20Reset%20Request"
                 className="text-sm font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
               >
                 Forgot password?
-              </Link>
+              </a>
             </div>
 
             {/* Submit */}

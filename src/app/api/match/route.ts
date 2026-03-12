@@ -164,9 +164,9 @@ function levenshtein(a: string, b: string): number {
 
 export async function POST(request: NextRequest) {
   try {
-    let projectId: string, signatureId: string;
+    let projectId: string, signatureId: string, overrideName: string | undefined, overrideAddress: string | undefined;
     try {
-      ({ projectId, signatureId } = await request.json());
+      ({ projectId, signatureId, overrideName, overrideAddress } = await request.json());
     } catch {
       return NextResponse.json(
         { success: false, error: "Invalid JSON in request body" },
@@ -233,8 +233,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const extractedName = signature.extracted_name || "";
-    const extractedAddress = signature.extracted_address || "";
+    const extractedName = overrideName ?? signature.extracted_name ?? "";
+    const extractedAddress = overrideAddress ?? signature.extracted_address ?? "";
     const hasAddress = !!extractedAddress && extractedAddress !== "Unable to extract";
 
     // Step 1: Use Fuse.js to get name candidates (broad search)

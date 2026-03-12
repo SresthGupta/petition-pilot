@@ -29,15 +29,15 @@ const contactInfo = [
     icon: MapPin,
     label: "Office",
     value: "1455 Pennsylvania Ave NW, Suite 400, Washington, DC 20004",
-    href: "#",
+    href: "https://maps.google.com/?q=1455+Pennsylvania+Ave+NW+Suite+400+Washington+DC+20004",
   },
 ];
 
 const faqLinks = [
-  { question: "How does signature verification work?", href: "#" },
-  { question: "What file formats do you support?", href: "#" },
-  { question: "How accurate is the AI matching?", href: "#" },
-  { question: "Can I integrate with my voter database?", href: "#" },
+  { question: "How does signature verification work?", href: "/pricing#faq" },
+  { question: "What file formats do you support?", href: "/pricing#faq" },
+  { question: "How accurate is the AI matching?", href: "/pricing#faq" },
+  { question: "Can I integrate with my voter database?", href: "/contact" },
 ];
 
 export default function ContactPage() {
@@ -46,11 +46,12 @@ export default function ContactPage() {
   const [organization, setOrganization] = useState("");
   const [message, setMessage] = useState("");
   const [plan, setPlan] = useState("");
+  const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Stub: would submit to API
-    alert("Message sent! We'll be in touch soon.");
+    // TODO: integrate with backend API or email service
+    setSubmitted(true);
     setName("");
     setEmail("");
     setOrganization("");
@@ -79,6 +80,11 @@ export default function ContactPage() {
             <h2 className="text-lg font-semibold text-gray-900 mb-6">
               Send us a message
             </h2>
+            {submitted && (
+              <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                Thanks for reaching out! We&apos;ll get back to you within 24 hours.
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700">
@@ -185,7 +191,7 @@ export default function ContactPage() {
 
             {/* Book a Demo card */}
             <a
-              href="#"
+              href="mailto:hello@petitionpilot.com?subject=Demo%20Request"
               className="flex items-center gap-4 rounded-xl border-2 border-indigo-100 bg-indigo-50/50 p-6 hover:border-indigo-200 transition-all group"
             >
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-600 group-hover:bg-indigo-700 transition-colors">

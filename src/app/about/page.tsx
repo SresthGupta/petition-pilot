@@ -7,9 +7,6 @@ import {
   Eye,
   Users,
   Mail,
-  Linkedin,
-  Twitter,
-  Github,
   ArrowRight,
   User,
 } from "lucide-react";
@@ -173,22 +170,6 @@ export default function AboutPage() {
                 <p className="mt-3 text-sm leading-relaxed text-gray-500">
                   {member.bio}
                 </p>
-                <div className="mt-4 flex items-center justify-center gap-3">
-                  <a
-                    href="#"
-                    className="text-gray-400 hover:text-indigo-600 transition-colors"
-                    aria-label={`${member.name} on LinkedIn`}
-                  >
-                    <Linkedin className="h-4 w-4" />
-                  </a>
-                  <a
-                    href="#"
-                    className="text-gray-400 hover:text-indigo-600 transition-colors"
-                    aria-label={`${member.name} on Twitter`}
-                  >
-                    <Twitter className="h-4 w-4" />
-                  </a>
-                </div>
               </div>
             ))}
           </div>
@@ -213,29 +194,6 @@ export default function AboutPage() {
             </a>
           </div>
 
-          <div className="mt-8 flex items-center justify-center gap-5">
-            <a
-              href="#"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white border border-gray-200 text-gray-500 shadow-sm hover:text-indigo-600 hover:border-indigo-300 transition-all"
-              aria-label="Twitter"
-            >
-              <Twitter className="h-4 w-4" />
-            </a>
-            <a
-              href="#"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white border border-gray-200 text-gray-500 shadow-sm hover:text-indigo-600 hover:border-indigo-300 transition-all"
-              aria-label="LinkedIn"
-            >
-              <Linkedin className="h-4 w-4" />
-            </a>
-            <a
-              href="#"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white border border-gray-200 text-gray-500 shadow-sm hover:text-indigo-600 hover:border-indigo-300 transition-all"
-              aria-label="GitHub"
-            >
-              <Github className="h-4 w-4" />
-            </a>
-          </div>
         </div>
       </section>
 
