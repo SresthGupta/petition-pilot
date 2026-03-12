@@ -115,6 +115,7 @@ export default function VerifyPage() {
   const [editedName, setEditedName] = useState("");
   const [editedAddress, setEditedAddress] = useState("");
   const [pdfImageUrl, setPdfImageUrl] = useState<string | null>(null);
+  const pdfCacheRef = useRef<{ sheetId: string; url: string } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const isSearchFocused = useRef(false);
   const [startTime] = useState(Date.now());
@@ -471,20 +472,25 @@ export default function VerifyPage() {
       })()
     : null;
 
-  // Render PDF sheets to image for cropping
+  // Render PDF sheets to image for cropping (cached per sheet)
   const isPdf = currentSheet ? /\.pdf$/i.test(currentSheet.file_name) : false;
+  const currentSheetId = currentSheet?.id ?? null;
   useEffect(() => {
-    if (!isPdf || !sheetImageUrl) {
+    if (!isPdf || !sheetImageUrl || !currentSheetId) {
       setPdfImageUrl(null);
+      return;
+    }
+    // Cache hit: reuse already-rendered image for this sheet
+    if (pdfCacheRef.current?.sheetId === currentSheetId) {
+      setPdfImageUrl(pdfCacheRef.current.url);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const pdf = await pdfjsLib.getDocument(sheetImageUrl).promise;
+        const pdf = await pdfjsLib.getDocument({ url: sheetImageUrl, disableAutoFetch: true, disableStream: false }).promise;
         const page = await pdf.getPage(1);
-        const scale = 2; // render at 2x for clarity
-        const viewport = page.getViewport({ scale });
+        const viewport = page.getViewport({ scale: 1.5 });
         const canvas = document.createElement("canvas");
         canvas.width = viewport.width;
         canvas.height = viewport.height;
@@ -492,22 +498,23 @@ export default function VerifyPage() {
         if (!cancelled) {
           canvas.toBlob((blob) => {
             if (blob && !cancelled) {
-              setPdfImageUrl(URL.createObjectURL(blob));
+              // Revoke old cached URL if it's for a different sheet
+              if (pdfCacheRef.current && pdfCacheRef.current.sheetId !== currentSheetId) {
+                URL.revokeObjectURL(pdfCacheRef.current.url);
+              }
+              const url = URL.createObjectURL(blob);
+              pdfCacheRef.current = { sheetId: currentSheetId, url };
+              setPdfImageUrl(url);
             }
-          }, "image/png");
+          }, "image/jpeg", 0.85);
         }
+        pdf.destroy();
       } catch {
         if (!cancelled) setPdfImageUrl(null);
       }
     })();
-    return () => {
-      cancelled = true;
-      setPdfImageUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
-    };
-  }, [isPdf, sheetImageUrl]);
+    return () => { cancelled = true; };
+  }, [isPdf, sheetImageUrl, currentSheetId]);
 
   // Unified image URL: rendered PDF image or direct image URL
   const displayImageUrl = isPdf ? pdfImageUrl : sheetImageUrl;
