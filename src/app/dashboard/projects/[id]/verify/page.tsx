@@ -4,9 +4,15 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Fuse from "fuse.js";
+import * as pdfjsLib from "pdfjs-dist";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import type { Tables } from "@/lib/supabase/types";
+
+// Configure pdf.js worker
+if (typeof window !== "undefined") {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+}
 import {
   ArrowLeft,
   ChevronLeft,
@@ -108,6 +114,7 @@ export default function VerifyPage() {
   const [imageExpanded, setImageExpanded] = useState(false);
   const [editedName, setEditedName] = useState("");
   const [editedAddress, setEditedAddress] = useState("");
+  const [pdfImageUrl, setPdfImageUrl] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const isSearchFocused = useRef(false);
   const [startTime] = useState(Date.now());
@@ -464,6 +471,47 @@ export default function VerifyPage() {
       })()
     : null;
 
+  // Render PDF sheets to image for cropping
+  const isPdf = currentSheet ? /\.pdf$/i.test(currentSheet.file_name) : false;
+  useEffect(() => {
+    if (!isPdf || !sheetImageUrl) {
+      setPdfImageUrl(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const pdf = await pdfjsLib.getDocument(sheetImageUrl).promise;
+        const page = await pdf.getPage(1);
+        const scale = 2; // render at 2x for clarity
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await page.render({ canvas, viewport }).promise;
+        if (!cancelled) {
+          canvas.toBlob((blob) => {
+            if (blob && !cancelled) {
+              setPdfImageUrl(URL.createObjectURL(blob));
+            }
+          }, "image/png");
+        }
+      } catch {
+        if (!cancelled) setPdfImageUrl(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      setPdfImageUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, [isPdf, sheetImageUrl]);
+
+  // Unified image URL: rendered PDF image or direct image URL
+  const displayImageUrl = isPdf ? pdfImageUrl : sheetImageUrl;
+
   // ---------- Loading State ----------
 
   if (loading) {
@@ -673,7 +721,7 @@ export default function VerifyPage() {
                     <h3 className="text-base font-bold text-gray-900">Image</h3>
                     <p className="text-xs text-gray-500">Handwritten text of the given signature.</p>
                   </div>
-                  {sheetImageUrl && currentSheet && /\.(png|jpe?g|gif|webp|bmp|tiff?)$/i.test(currentSheet.file_name) && (
+                  {displayImageUrl && (
                     <button
                       onClick={() => setImageExpanded(!imageExpanded)}
                       className="rounded-lg border border-gray-200 p-1.5 text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-colors"
@@ -684,7 +732,7 @@ export default function VerifyPage() {
                   )}
                 </div>
 
-                {sheetImageUrl && currentSheet && /\.(png|jpe?g|gif|webp|bmp|tiff?)$/i.test(currentSheet.file_name) ? (
+                {displayImageUrl ? (
                   (() => {
                     // Calculate crop position based on line number
                     const sigsOnSheet = signatures.filter((s) => s.sheet_id === current.sheet_id);
@@ -708,7 +756,7 @@ export default function VerifyPage() {
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src={sheetImageUrl}
+                            src={displayImageUrl}
                             alt={`Entry row ${lineNum} on sheet ${currentSheetNumber}`}
                             className="w-full absolute left-0"
                             style={{
@@ -735,7 +783,7 @@ export default function VerifyPage() {
                           <div className="mt-2 rounded-lg border border-gray-200 overflow-hidden max-h-[500px] overflow-y-auto">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
-                              src={sheetImageUrl}
+                              src={displayImageUrl}
                               alt={`Petition sheet ${currentSheetNumber}`}
                               className="w-full object-contain"
                             />
@@ -744,11 +792,16 @@ export default function VerifyPage() {
                       </div>
                     );
                   })()
+                ) : isPdf && !pdfImageUrl ? (
+                  <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-8 text-center">
+                    <Loader2 className="mx-auto h-10 w-10 text-gray-300 animate-spin" />
+                    <p className="mt-2 text-sm text-gray-400">Rendering PDF...</p>
+                  </div>
                 ) : (
                   <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-8 text-center">
                     <FileText className="mx-auto h-10 w-10 text-gray-300" />
                     <p className="mt-2 text-sm text-gray-400">
-                      {currentSheet ? "PDF preview not available" : "No sheet uploaded"}
+                      {currentSheet ? "No preview available" : "No sheet uploaded"}
                     </p>
                   </div>
                 )}
