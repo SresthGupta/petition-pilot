@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -66,7 +67,13 @@ export default function DashboardLayout({
     router.push("/login");
   };
 
-  if (loading) {
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login");
+    }
+  }, [loading, user, router]);
+
+  if (loading || !user) {
     return (
       <div className="flex h-screen items-center justify-center bg-[var(--background)]">
         <div className="flex flex-col items-center gap-3">
@@ -75,11 +82,6 @@ export default function DashboardLayout({
         </div>
       </div>
     );
-  }
-
-  if (!user) {
-    router.push("/login");
-    return null;
   }
 
   const displayName = profile?.full_name || user.user_metadata?.full_name || user.email || "User";

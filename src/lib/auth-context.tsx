@@ -44,7 +44,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     console.warn("Failed to fetch profile after retries for user:", userId);
-  }, [supabase]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -71,7 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase, fetchProfile]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });

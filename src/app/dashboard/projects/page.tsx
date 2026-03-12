@@ -63,7 +63,7 @@ export default function ProjectsPage() {
       setProjects((data ?? []) as typeof projects);
     }
     setLoading(false);
-  }, [user, supabase]);
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchProjects();

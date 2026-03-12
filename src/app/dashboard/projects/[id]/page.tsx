@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -59,7 +59,6 @@ const tabs = [
 
 export default function ProjectDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const { user } = useAuth();
   const supabase = createClient();
   const id = params.id as string;
@@ -124,7 +123,8 @@ export default function ProjectDetailPage() {
     setSheets((sheetResult.data ?? []) as unknown as PetitionSheet[]);
     setVoterFiles((voterFileResult.data ?? []) as unknown as VoterFile[]);
     setLoading(false);
-  }, [user, id, supabase]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, id]);
 
   const parseVoterFile = useCallback(async (voterFileId: string) => {
     setParsingVoterFile(voterFileId);
@@ -149,7 +149,8 @@ export default function ProjectDetailPage() {
       await fetchData();
     }
     setParsingVoterFile(null);
-  }, [supabase, fetchData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchData]);
 
   useEffect(() => {
     fetchData();
@@ -648,7 +649,7 @@ export default function ProjectDetailPage() {
                         </td>
                         <td className="px-4 py-3 text-[var(--muted)]">
                           {sig.match_confidence != null
-                            ? `${Math.round(sig.match_confidence * 100)}%`
+                            ? `${Math.round(sig.match_confidence)}%`
                             : "-"}
                         </td>
                       </tr>
@@ -721,7 +722,7 @@ function SheetPreview({ sheet }: { sheet: PetitionSheet }) {
       (async () => {
         try {
           const pdfjsLib = await import("pdfjs-dist");
-          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+          pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
           const pdf = await pdfjsLib.getDocument({ url: publicUrl, disableAutoFetch: true }).promise;
           const page = await pdf.getPage(1);
           const viewport = page.getViewport({ scale: 1 });

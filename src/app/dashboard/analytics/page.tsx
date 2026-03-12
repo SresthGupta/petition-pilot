@@ -148,7 +148,7 @@ export default function AnalyticsPage() {
 
     fetchData();
     return () => { cancelled = true; };
-  }, [user, supabase]);
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Filter signatures by date range
   const filteredSignatures = useMemo(() => {

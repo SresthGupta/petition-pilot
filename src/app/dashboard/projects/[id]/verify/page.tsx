@@ -148,7 +148,8 @@ export default function VerifyPage() {
       .eq("id", projectId)
       .single();
     if (data) setProject(data as unknown as Tables<"projects">);
-  }, [supabase, projectId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
   const fetchSignatures = useCallback(async () => {
     const { data } = await supabase
@@ -164,7 +165,8 @@ export default function VerifyPage() {
       const firstPending = typed.findIndex((s) => s.status === "pending");
       if (firstPending >= 0) setCurrentIndex(firstPending);
     }
-  }, [supabase, projectId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
   const fetchSheets = useCallback(async () => {
     const { data } = await supabase
@@ -173,7 +175,8 @@ export default function VerifyPage() {
       .eq("project_id", projectId)
       .order("sheet_number");
     if (data) setSheets(data as unknown as Tables<"petition_sheets">[]);
-  }, [supabase, projectId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
   const fetchVoters = useCallback(async () => {
     const { data } = await supabase
@@ -181,7 +184,8 @@ export default function VerifyPage() {
       .select("*")
       .eq("project_id", projectId);
     if (data) setVoters(data as unknown as Tables<"voters">[]);
-  }, [supabase, projectId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
   useEffect(() => {
     async function loadAll() {
@@ -372,7 +376,8 @@ export default function VerifyPage() {
       }
       setOcrRunning(null);
     },
-    [fetchSignatures, fetchSheets, supabase]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fetchSignatures, fetchSheets]
   );
 
   // ---------- Keyboard Shortcuts ----------
@@ -483,7 +488,7 @@ export default function VerifyPage() {
     (async () => {
       try {
         const pdfjsLib = await import("pdfjs-dist");
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
         const pdf = await pdfjsLib.getDocument({ url: sheetImageUrl, disableAutoFetch: true, disableStream: false }).promise;
         const page = await pdf.getPage(1);
         const viewport = page.getViewport({ scale: 1.5 });

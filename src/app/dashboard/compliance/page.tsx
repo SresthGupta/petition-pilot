@@ -185,7 +185,7 @@ export default function CompliancePage() {
 
     fetchData();
     return () => { cancelled = true; };
-  }, [user, supabase]);
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Compliance Checks ───────────────────────────────────────────────────
 
