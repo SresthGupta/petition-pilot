@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -18,6 +18,8 @@ import {
   Table,
   Stamp,
   Building2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
@@ -71,6 +73,7 @@ export default function ProjectDetailPage() {
   const [voterFiles, setVoterFiles] = useState<VoterFile[]>([]);
   const [parsingVoterFile, setParsingVoterFile] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [sheetPreviews, setSheetPreviews] = useState<Set<string>>(new Set());
 
   const fetchData = useCallback(async () => {
     if (!user || !id) return;
@@ -420,24 +423,47 @@ export default function ProjectDetailPage() {
                   };
                   const ocrInfo = ocrStatusConfig[sheet.ocr_status] ?? ocrStatusConfig.pending;
 
+                  const isPreviewOpen = sheetPreviews.has(sheet.id);
+                  const togglePreview = () => {
+                    setSheetPreviews((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(sheet.id)) next.delete(sheet.id);
+                      else next.add(sheet.id);
+                      return next;
+                    });
+                  };
+
                   return (
-                    <div key={sheet.id} className="flex items-center gap-4 py-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
-                        <FileText className="h-4 w-4 text-[var(--primary)]" />
+                    <div key={sheet.id} className="py-3">
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
+                          <FileText className="h-4 w-4 text-[var(--primary)]" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="truncate text-sm font-medium text-[var(--foreground)]">
+                            Sheet #{sheet.sheet_number}: {sheet.file_name}
+                          </p>
+                          <p className="text-xs text-[var(--muted)]">
+                            {(sheet.file_size / (1024 * 1024)).toFixed(1)} MB
+                          </p>
+                        </div>
+                        <button
+                          onClick={togglePreview}
+                          className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                        >
+                          {isPreviewOpen ? (
+                            <><EyeOff className="h-3.5 w-3.5" /> Hide</>
+                          ) : (
+                            <><Eye className="h-3.5 w-3.5" /> Preview</>
+                          )}
+                        </button>
+                        <span
+                          className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${ocrInfo.color}`}
+                        >
+                          {ocrInfo.label}
+                        </span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="truncate text-sm font-medium text-[var(--foreground)]">
-                          Sheet #{sheet.sheet_number}: {sheet.file_name}
-                        </p>
-                        <p className="text-xs text-[var(--muted)]">
-                          {(sheet.file_size / (1024 * 1024)).toFixed(1)} MB
-                        </p>
-                      </div>
-                      <span
-                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${ocrInfo.color}`}
-                      >
-                        {ocrInfo.label}
-                      </span>
+                      {isPreviewOpen && <SheetPreview sheet={sheet} />}
                     </div>
                   );
                 })}
@@ -660,6 +686,75 @@ export default function ProjectDetailPage() {
           setExporting={setExporting}
         />
       )}
+    </div>
+  );
+}
+
+/* ── Sheet Preview Component ──────────────────────────────────────────── */
+
+function SheetPreview({ sheet }: { sheet: PetitionSheet }) {
+  const supabase = createClient();
+  const [imgUrl, setImgUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const rendered = useRef(false);
+
+  const isPdf = /\.pdf$/i.test(sheet.file_name);
+  const isImage = /\.(png|jpe?g|gif|webp|bmp|tiff?)$/i.test(sheet.file_name);
+
+  useEffect(() => {
+    if (rendered.current) return;
+    rendered.current = true;
+
+    const { data } = supabase.storage
+      .from("petition-sheets")
+      .getPublicUrl(sheet.file_path);
+    const publicUrl = data?.publicUrl;
+    if (!publicUrl) return;
+
+    if (isImage) {
+      setImgUrl(publicUrl);
+      return;
+    }
+
+    if (isPdf) {
+      setLoading(true);
+      (async () => {
+        try {
+          const pdfjsLib = await import("pdfjs-dist");
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+          const pdf = await pdfjsLib.getDocument({ url: publicUrl, disableAutoFetch: true }).promise;
+          const page = await pdf.getPage(1);
+          const viewport = page.getViewport({ scale: 1 });
+          const canvas = document.createElement("canvas");
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          await page.render({ canvas, viewport }).promise;
+          canvas.toBlob((blob) => {
+            if (blob) setImgUrl(URL.createObjectURL(blob));
+            setLoading(false);
+          }, "image/jpeg", 0.8);
+          pdf.destroy();
+        } catch {
+          setLoading(false);
+        }
+      })();
+    }
+  }, [sheet.file_path, isPdf, isImage, supabase.storage]);
+
+  if (loading) {
+    return (
+      <div className="mt-2 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 h-48">
+        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
+  if (!imgUrl) return null;
+
+  return (
+    <div className="mt-2 rounded-lg border border-gray-200 overflow-hidden max-h-64 overflow-y-auto">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={imgUrl} alt={sheet.file_name} className="w-full object-contain" />
     </div>
   );
 }
