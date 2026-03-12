@@ -706,24 +706,24 @@ function SheetPreview({ sheet }: { sheet: PetitionSheet }) {
     if (rendered.current) return;
     rendered.current = true;
 
-    const { data } = supabase.storage
-      .from("petition-sheets")
-      .getPublicUrl(sheet.file_path);
-    const publicUrl = data?.publicUrl;
-    if (!publicUrl) return;
+    (async () => {
+      const { data, error } = await supabase.storage
+        .from("petition-sheets")
+        .createSignedUrl(sheet.file_path, 3600);
+      if (error || !data?.signedUrl) return;
+      const signedUrl = data.signedUrl;
 
-    if (isImage) {
-      setImgUrl(publicUrl);
-      return;
-    }
+      if (isImage) {
+        setImgUrl(signedUrl);
+        return;
+      }
 
-    if (isPdf) {
-      setLoading(true);
-      (async () => {
+      if (isPdf) {
+        setLoading(true);
         try {
           const pdfjsLib = await import("pdfjs-dist");
           pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-          const pdf = await pdfjsLib.getDocument({ url: publicUrl, disableAutoFetch: true }).promise;
+          const pdf = await pdfjsLib.getDocument({ url: signedUrl, disableAutoFetch: true }).promise;
           const page = await pdf.getPage(1);
           const viewport = page.getViewport({ scale: 1 });
           const canvas = document.createElement("canvas");
@@ -738,9 +738,10 @@ function SheetPreview({ sheet }: { sheet: PetitionSheet }) {
         } catch {
           setLoading(false);
         }
-      })();
-    }
-  }, [sheet.file_path, isPdf, isImage, supabase.storage]);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheet.file_path]);
 
   if (loading) {
     return (

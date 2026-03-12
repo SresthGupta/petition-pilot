@@ -108,6 +108,7 @@ export default function VerifyPage() {
   const [imageExpanded, setImageExpanded] = useState(false);
   const [editedName, setEditedName] = useState("");
   const [editedAddress, setEditedAddress] = useState("");
+  const [sheetImageUrl, setSheetImageUrl] = useState<string | null>(null);
   const [pdfImageUrl, setPdfImageUrl] = useState<string | null>(null);
   const pdfCacheRef = useRef<{ sheetId: string; url: string } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -460,16 +461,27 @@ export default function VerifyPage() {
   const activeMatch =
     selectedMatchIndex !== null ? matches[selectedMatchIndex] : bestMatch;
 
-  // ---------- Petition sheet image URL ----------
+  // ---------- Petition sheet image URL (signed for private bucket) ----------
 
-  const sheetImageUrl = currentSheet
-    ? (() => {
-        const { data } = supabase.storage
-          .from("petition-sheets")
-          .getPublicUrl(currentSheet.file_path);
-        return data?.publicUrl ?? null;
-      })()
-    : null;
+  useEffect(() => {
+    if (!currentSheet) {
+      setSheetImageUrl(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.storage
+        .from("petition-sheets")
+        .createSignedUrl(currentSheet.file_path, 3600); // 1 hour expiry
+      if (!cancelled && !error && data?.signedUrl) {
+        setSheetImageUrl(data.signedUrl);
+      } else if (!cancelled) {
+        setSheetImageUrl(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSheet?.id]);
 
   // Render PDF sheets to image for cropping (cached per sheet)
   const isPdf = currentSheet ? /\.pdf$/i.test(currentSheet.file_name) : false;

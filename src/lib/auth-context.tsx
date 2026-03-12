@@ -49,11 +49,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          await fetchProfile(session.user.id);
+          fetchProfile(session.user.id); // fire-and-forget, don't block loading
         } else {
           setProfile(null);
         }
@@ -76,7 +76,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error && data.session) {
+      // Set state immediately so router.push doesn't race with onAuthStateChange
+      setSession(data.session);
+      setUser(data.session.user);
+      fetchProfile(data.session.user.id); // fire-and-forget, don't block navigation
+    }
     return { error: error?.message ?? null };
   };
 
